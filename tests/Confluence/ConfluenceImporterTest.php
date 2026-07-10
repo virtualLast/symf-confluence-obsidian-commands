@@ -8,6 +8,7 @@ use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
+use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 use PHPUnit\Framework\TestCase;
 
@@ -32,24 +33,29 @@ class ConfluenceImporterTest extends TestCase
         $pageStub = $this->createStub(AbstractContent::class);
         $pageStub
             ->method('getId')
-            ->willReturn($pageId);
+            ->willReturn($pageId)
+        ;
         $pageStub
             ->method('getTitle')
-            ->willReturn($title);
+            ->willReturn($title)
+        ;
         $pageStub
             ->method('getContent')
-            ->willReturn($content);
+            ->willReturn($content)
+        ;
 
         $confluenceClientMock = $this->createMock(ConfluenceClient::class);
         $confluenceClientMock
             ->expects($this->once())
             ->method('getPage')
             ->with($pageId)
-            ->willReturn($pageStub);
+            ->willReturn($pageStub)
+        ;
 
         $confluenceClientMock
             ->expects($this->never())
-            ->method('getPageChildren');
+            ->method('getPageChildren')
+        ;
 
         // act
         $importer = new ConfluenceImporter($confluenceClientMock, $converter);
@@ -121,8 +127,13 @@ class ConfluenceImporterTest extends TestCase
 
     private function createConfluenceContentConverter(): ConfluenceContentConverter
     {
-        return new ConfluenceContentConverter(new HtmlConverter([
+        $htmlConverter = new HtmlConverter([
             'header_style' => 'atx',
-        ]));
+            'table_pipe_escape' => '\|'
+        ]);
+        $htmlConverter->getEnvironment()->addConverter(new TableConverter());
+        return new ConfluenceContentConverter(
+            $htmlConverter
+        );
     }
 }
