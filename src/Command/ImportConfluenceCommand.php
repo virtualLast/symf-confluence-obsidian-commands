@@ -3,7 +3,6 @@
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
-use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
 use Http\Client\Exception;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -54,7 +53,7 @@ class ImportConfluenceCommand extends Command
             return Command::FAILURE;
         }
 
-        dump($pageContent);
+        dump($pageContent->content);
 
         $io->success('You have a new command! Now make it your own! Pass --help to see your options.');
 
