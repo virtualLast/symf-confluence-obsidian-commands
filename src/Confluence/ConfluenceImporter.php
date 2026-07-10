@@ -12,6 +12,7 @@ readonly class ConfluenceImporter
 {
     public function __construct(
         private ConfluenceClient $confluenceClient,
+        private ConfluenceContentConverter $confluenceContentConverter,
     ) {
     }
 
@@ -28,10 +29,12 @@ readonly class ConfluenceImporter
             return $this->confluenceClient->getPageChildren($page);
         }
 
+        $markdown = $this->confluenceContentConverter->toMarkdown($page->getContent());
+
         return new ImportedPage(
             $page->getId(),
             $page->getTitle(),
-            $page->getContent(),
+            $markdown,
         );
     }
 }
