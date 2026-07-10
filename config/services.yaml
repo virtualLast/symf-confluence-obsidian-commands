@@ -26,3 +26,4 @@ services:
         arguments:
             $options:
                 header_style: atx
+                table_pipe_escape: '\|'
