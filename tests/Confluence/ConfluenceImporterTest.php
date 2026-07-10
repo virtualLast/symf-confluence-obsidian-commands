@@ -4,6 +4,7 @@ namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceImporter;
+use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use PHPUnit\Framework\TestCase;
@@ -22,23 +23,40 @@ class ConfluenceImporterTest extends TestCase
     {
         // arrange
         $pageId = 664600597;
-        $pageStub = $this->createStub(AbstractContent::class);
-        $confluenceClientMock = $this->createMock(ConfluenceClient::class);
+        $title = 'Test page';
+        $content = '<p>Test content</p>';
 
-        $confluenceClientMock->expects($this->once())
+        $pageStub = $this->createStub(AbstractContent::class);
+        $pageStub
+            ->method('getId')
+            ->willReturn($pageId);
+        $pageStub
+            ->method('getTitle')
+            ->willReturn($title);
+        $pageStub
+            ->method('getContent')
+            ->willReturn($content);
+
+        $confluenceClientMock = $this->createMock(ConfluenceClient::class);
+        $confluenceClientMock
+            ->expects($this->once())
             ->method('getPage')
             ->with($pageId)
             ->willReturn($pageStub);
+
         $confluenceClientMock
             ->expects($this->never())
             ->method('getPageChildren');
 
         // act
         $importer = new ConfluenceImporter($confluenceClientMock);
-        $importPage = $importer->importPage($pageId);
+        $importedPage = $importer->importPage($pageId);
 
         // assert
-        $this->assertSame($pageStub, $importPage);
+        $this->assertInstanceOf(ImportedPage::class, $importedPage);
+        $this->assertSame($pageId, $importedPage->id);
+        $this->assertSame($title, $importedPage->title);
+        $this->assertSame($content, $importedPage->content);
     }
 
     /**
