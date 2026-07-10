@@ -8,8 +8,6 @@ use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
-use League\HTMLToMarkdown\Converter\TableConverter;
-use League\HTMLToMarkdown\HtmlConverter;
 use PHPUnit\Framework\TestCase;
 
 class ConfluenceImporterTest extends TestCase
@@ -127,13 +125,6 @@ class ConfluenceImporterTest extends TestCase
 
     private function createConfluenceContentConverter(): ConfluenceContentConverter
     {
-        $htmlConverter = new HtmlConverter([
-            'header_style' => 'atx',
-            'table_pipe_escape' => '\|'
-        ]);
-        $htmlConverter->getEnvironment()->addConverter(new TableConverter());
-        return new ConfluenceContentConverter(
-            $htmlConverter
-        );
+        return ConfluenceContentConverterFactory::create();
     }
 }
