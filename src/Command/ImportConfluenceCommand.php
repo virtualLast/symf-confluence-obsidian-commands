@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
+use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
 use Http\Client\Exception;
 use Symfony\Component\Console\Attribute\AsCommand;

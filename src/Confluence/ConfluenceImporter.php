@@ -2,6 +2,7 @@
 
 namespace App\Confluence;
 
+use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
@@ -19,7 +20,7 @@ readonly class ConfluenceImporter
      * @throws ConfluencePhpClientException
      * @throws \JsonException
      */
-    public function importPage(int $pageId, bool $includeChildren = false): AbstractContent|ContentSearchResult
+    public function importPage(int $pageId, bool $includeChildren = false): ImportedPage|ContentSearchResult
     {
         $page = $this->confluenceClient->getPage($pageId);
 
@@ -27,6 +28,10 @@ readonly class ConfluenceImporter
             return $this->confluenceClient->getPageChildren($page);
         }
 
-        return $page;
+        return new ImportedPage(
+            $page->getId(),
+            $page->getTitle(),
+            $page->getContent(),
+        );
     }
 }
