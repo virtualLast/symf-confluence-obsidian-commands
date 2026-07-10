@@ -24,9 +24,7 @@ class ConfluenceImporterTest extends TestCase
     public function testImportPageFetchesPageFromConfluence(): void
     {
         // arrange
-        $converter = new ConfluenceContentConverter(
-            new HtmlConverter()
-        );
+        $converter = $this->createConfluenceContentConverter();
         $pageId = 664600597;
         $title = 'Test page';
         $content = 'Test content';
@@ -73,9 +71,7 @@ class ConfluenceImporterTest extends TestCase
     public function testConvertsHtmlContentToMarkdown(): void
     {
         // arrange
-        $converter = new ConfluenceContentConverter(
-            new HtmlConverter()
-        );
+        $converter = $this->createConfluenceContentConverter();
         // act
         $result = $converter->toMarkdown(
             '<h2>Heading</h2><p>Hello <strong>world</strong></p>',
@@ -96,9 +92,7 @@ class ConfluenceImporterTest extends TestCase
     public function testImportPageWithChildrenFetchesPageAndChildrenFromConfluence(): void
     {
         // arrange
-        $converter = new ConfluenceContentConverter(
-            new HtmlConverter()
-        );
+        $converter = $this->createConfluenceContentConverter();
         $pageId = 664600597;
         $pageStub = $this->createStub(AbstractContent::class);
         $pagesStub = $this->createStub(ContentSearchResult::class);
@@ -123,5 +117,12 @@ class ConfluenceImporterTest extends TestCase
 
         // assert
         $this->assertSame($pagesStub, $importPages);
+    }
+
+    private function createConfluenceContentConverter(): ConfluenceContentConverter
+    {
+        return new ConfluenceContentConverter(new HtmlConverter([
+            'header_style' => 'atx',
+        ]));
     }
 }
