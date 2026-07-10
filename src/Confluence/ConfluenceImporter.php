@@ -24,10 +24,7 @@ readonly class ConfluenceImporter
         $page = $this->confluenceClient->getPage($pageId);
 
         if ($includeChildren) {
-            $children = $this->confluenceClient->getPageChildren($page);
-
-            // Temporary: inspect this before writing files.
-            dump($children);
+            return $this->confluenceClient->getPageChildren($page);
         }
 
         return $page;
