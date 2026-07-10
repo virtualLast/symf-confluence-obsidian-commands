@@ -3,10 +3,12 @@
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
+use League\HTMLToMarkdown\HtmlConverter;
 use PHPUnit\Framework\TestCase;
 
 class ConfluenceImporterTest extends TestCase
@@ -22,9 +24,12 @@ class ConfluenceImporterTest extends TestCase
     public function testImportPageFetchesPageFromConfluence(): void
     {
         // arrange
+        $converter = new ConfluenceContentConverter(
+            new HtmlConverter()
+        );
         $pageId = 664600597;
         $title = 'Test page';
-        $content = '<p>Test content</p>';
+        $content = 'Test content';
 
         $pageStub = $this->createStub(AbstractContent::class);
         $pageStub
@@ -49,7 +54,7 @@ class ConfluenceImporterTest extends TestCase
             ->method('getPageChildren');
 
         // act
-        $importer = new ConfluenceImporter($confluenceClientMock);
+        $importer = new ConfluenceImporter($confluenceClientMock, $converter);
         $importedPage = $importer->importPage($pageId);
 
         // assert
@@ -57,6 +62,29 @@ class ConfluenceImporterTest extends TestCase
         $this->assertSame($pageId, $importedPage->id);
         $this->assertSame($title, $importedPage->title);
         $this->assertSame($content, $importedPage->content);
+    }
+
+    /**
+     * what: tests that the HTML content is converted to Markdown
+     * why: To ensure that the importer correctly converts HTML content to Markdown
+     * how: By mocking the ConfluenceClient and asserting that the expected methods are called with the correct parameters
+     * @return void
+     */
+    public function testConvertsHtmlContentToMarkdown(): void
+    {
+        // arrange
+        $converter = new ConfluenceContentConverter(
+            new HtmlConverter()
+        );
+        // act
+        $result = $converter->toMarkdown(
+            '<h2>Heading</h2><p>Hello <strong>world</strong></p>',
+        );
+        // assert
+        $this->assertSame(
+            "## Heading\n\nHello **world**",
+            trim($result),
+        );
     }
 
     /**
@@ -68,6 +96,9 @@ class ConfluenceImporterTest extends TestCase
     public function testImportPageWithChildrenFetchesPageAndChildrenFromConfluence(): void
     {
         // arrange
+        $converter = new ConfluenceContentConverter(
+            new HtmlConverter()
+        );
         $pageId = 664600597;
         $pageStub = $this->createStub(AbstractContent::class);
         $pagesStub = $this->createStub(ContentSearchResult::class);
@@ -87,7 +118,7 @@ class ConfluenceImporterTest extends TestCase
         ;
 
         // act
-        $importer = new ConfluenceImporter($confluenceClientMock);
+        $importer = new ConfluenceImporter($confluenceClientMock, $converter);
         $importPages = $importer->importPage($pageId, true);
 
         // assert
