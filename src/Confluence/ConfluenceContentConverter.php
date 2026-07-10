@@ -8,6 +8,7 @@ use League\HTMLToMarkdown\HtmlConverter;
 final readonly class ConfluenceContentConverter
 {
     public function __construct(
+        private ConfluenceStoragePreprocessor $preprocessor,
         private HtmlConverter $htmlConverter,
     ) {
         $this->htmlConverter
@@ -20,6 +21,8 @@ final readonly class ConfluenceContentConverter
 
     public function toMarkdown(string $content): string
     {
-        return $this->htmlConverter->convert($content);
+        $html = $this->preprocessor->process($content);
+
+        return $this->htmlConverter->convert($html);
     }
 }
