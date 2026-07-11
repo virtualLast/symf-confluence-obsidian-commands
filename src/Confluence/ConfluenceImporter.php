@@ -20,13 +20,9 @@ readonly class ConfluenceImporter
      * @throws ConfluencePhpClientException
      * @throws \JsonException
      */
-    public function importPage(int $pageId, bool $includeChildren = false): ImportedPage|ContentSearchResult
+    public function importPage(int $pageId): ImportedPage
     {
         $page = $this->confluenceClient->getPage($pageId);
-
-        if ($includeChildren) {
-            return $this->confluenceClient->getPageChildren($page);
-        }
 
         $markdown = $this->confluenceContentConverter->toMarkdown($page->getContent());
 
