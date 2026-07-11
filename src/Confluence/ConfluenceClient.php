@@ -4,8 +4,8 @@ namespace App\Confluence;
 
 use CloudPlayDev\ConfluenceClient\Api\Content;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
-use CloudPlayDev\ConfluenceClient\Entity\ContentPage;
 use CloudPlayDev\ConfluenceClient\ConfluenceClient as Client;
+use CloudPlayDev\ConfluenceClient\Entity\ContentBody;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
 use Http\Client\Exception;
@@ -24,16 +24,36 @@ readonly class ConfluenceClient
     }
 
     /**
-     * @throws Exception
      * @throws ConfluencePhpClientException
      * @throws \JsonException
      */
     public function getPage(int $pageId): AbstractContent
     {
         try {
-            return $this->getClient()->content()->get($pageId);
+            $contentApi = $this->getClient()->content();
+            $page = $contentApi->get($pageId);
+
+            $storageBody = new ContentBody();
+            $storageBody
+                ->setRepresentation(ContentBody::REPRESENTATION_STORAGE)
+                ->setValue($page->getContent() ?? '')
+            ;
+
+            $renderedBody = $contentApi->convert(
+                $storageBody,
+                ContentBody::REPRESENTATION_EXPORT_VIEW,
+                $page,
+            );
+
+            $page->setContent($renderedBody->getValue());
+
+            return $page;
         } catch (Exception $e) {
-            throw new ConfluencePhpClientException($e->getMessage(), $e->getCode(), $e);
+            throw new ConfluencePhpClientException(
+                $e->getMessage(),
+                $e->getCode(),
+                $e,
+            );
         }
     }
 

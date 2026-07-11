@@ -3,7 +3,6 @@
 namespace App\Confluence;
 
 use App\Model\ImportedPage;
-use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
 use Http\Client\Exception;
