@@ -53,9 +53,7 @@ class ImportConfluenceCommand extends Command
             return Command::FAILURE;
         }
 
-        dump($pageContent->content);
-
-        $io->success('You have a new command! Now make it your own! Pass --help to see your options.');
+        $io->writeln($pageContent->content);
 
         return Command::SUCCESS;
     }
