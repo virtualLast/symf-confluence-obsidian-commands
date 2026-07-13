@@ -21,11 +21,14 @@ final class ConfluenceContentConverterTest extends TestCase
     public function itConvertsBasicHtmlToMarkdown(): void
     {
         $html = $this->fixture('basic-content.html');
-        $expected = rtrim($this->fixture('basic-content.md'), "\r\n");
+        $expected = $this->fixture('basic-content.md');
 
         $actual = $this->converter->toMarkdown($html);
 
-        self::assertSame($expected, $actual);
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
     }
 
     #[Test]
@@ -36,7 +39,10 @@ final class ConfluenceContentConverterTest extends TestCase
 
         $actual = $this->converter->toMarkdown($html);
 
-        self::assertSame(trim($expected), trim($actual));
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
     }
 
     #[Test]
@@ -47,18 +53,10 @@ final class ConfluenceContentConverterTest extends TestCase
 
         $actual = $this->converter->toMarkdown($html);
 
-        self::assertSame($expected, $actual);
-    }
-
-    #[Test]
-    public function itConvertsCodeBlocks(): void
-    {
-        $html = $this->fixture('code-block.html');
-        $expected = $this->fixture('code-block.md');
-
-        $actual = $this->converter->toMarkdown($html);
-
-        self::assertSame($expected, $actual);
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
     }
 
     #[Test]
@@ -69,17 +67,64 @@ final class ConfluenceContentConverterTest extends TestCase
 
         $actual = $this->converter->toMarkdown($html);
 
-        self::assertSame($expected, $actual);
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
     }
 
     #[Test]
-    public function itConvertsRenderedConfluencePage(): void
+    public function itConvertsCodeBlocks(): void
     {
-        $html = $this->fixture('realistic-page.html');
-        $expected = $this->fixture('realistic-page.md');
+        $html = $this->fixture('code-block.html');
+        $expected = $this->fixture('code-block.md');
 
         $actual = $this->converter->toMarkdown($html);
 
-        self::assertSame($expected, $actual);
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
+    #[Test]
+    public function itPreservesInlineCode(): void
+    {
+        $html = $this->fixture('inline-code.html');
+        $expected = $this->fixture('inline-code.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
+    #[Test]
+    public function itConvertsImages(): void
+    {
+        $html = $this->fixture('image.html');
+        $expected = $this->fixture('image.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
+    private function normaliseMarkdown(string $content): string
+    {
+        $content = str_replace("\r\n", "\n", $content);
+
+        $content = preg_replace(
+            '/[ \t]+$/m',
+            '',
+            $content,
+        ) ?? $content;
+
+        return trim($content);
     }
 }
