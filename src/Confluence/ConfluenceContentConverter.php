@@ -22,6 +22,11 @@ final readonly class ConfluenceContentConverter
     {
         $markdown = $this->htmlConverter->convert($content);
 
+        return $this->removeLinesWithEmptySpace($markdown);
+    }
+
+    private function removeLinesWithEmptySpace(string $markdown): string
+    {
         return preg_replace('/^[\t ]+$/m', '', $markdown) ?? $markdown;
     }
 }

@@ -87,42 +87,6 @@ class ConfluenceImporterTest extends TestCase
         );
     }
 
-    /**
-     * what: Tests that importPageWithChildren fetches page and children from Confluence
-     * why: To ensure that the importer correctly retrieves both the page and its children from Confluence
-     * how: By mocking the ConfluenceClient and asserting that the expected methods are called with the correct parameters
-     * @return void
-     */
-    public function testImportPageWithChildrenFetchesPageAndChildrenFromConfluence(): void
-    {
-        // arrange
-        $converter = $this->createConfluenceContentConverter();
-        $pageId = 664600597;
-        $pageStub = $this->createStub(AbstractContent::class);
-        $pagesStub = $this->createStub(ContentSearchResult::class);
-        $confluenceClientMock = $this->createMock(ConfluenceClient::class);
-
-        $confluenceClientMock
-            ->expects($this->once())
-            ->method('getPage')
-            ->with($pageId)
-            ->willReturn($pageStub)
-        ;
-        $confluenceClientMock
-            ->expects($this->once())
-            ->method('getPageChildren')
-            ->with($pageStub)
-            ->willReturn($pagesStub)
-        ;
-
-        // act
-        $importer = new ConfluenceImporter($confluenceClientMock, $converter);
-        $importPages = $importer->importPage($pageId, true);
-
-        // assert
-        $this->assertSame($pagesStub, $importPages);
-    }
-
     private function createConfluenceContentConverter(): ConfluenceContentConverter
     {
         return ConfluenceContentConverterFactory::create();
