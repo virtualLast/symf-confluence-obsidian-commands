@@ -32,6 +32,20 @@ final class ConfluenceContentConverterTest extends TestCase
     }
 
     #[Test]
+    public function itConvertsMixedFormatting(): void
+    {
+        $html = $this->fixture('mixed.html');
+        $expected = $this->fixture('mixed.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
+    #[Test]
     public function itConvertsHtmlTablesToMarkdownTables(): void
     {
         $html = $this->fixture('table.html');
