@@ -14,6 +14,8 @@ final class ConfluenceContentConverterFactory
         $htmlConverter = new HtmlConverter([
             'header_style' => 'atx',
             'table_pipe_escape' => '\|',
+            'strip_tags' => true,
+            'remove_nodes' => 'style script',
         ]);
 
         $htmlConverter

@@ -2,47 +2,84 @@
 
 namespace App\Tests\Confluence;
 
-
 use App\Confluence\ConfluenceContentConverter;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-class ConfluenceContentConverterTest extends TestCase
+final class ConfluenceContentConverterTest extends TestCase
 {
-    public function testConvertsHtmlTableToMarkdown(): void
+    use ConfluenceFixtureTrait;
+
+    private ConfluenceContentConverter $converter;
+
+    protected function setUp(): void
     {
-        $converter = $this->createConfluenceContentConverter();
-
-        $result = $converter->toMarkdown(
-            <<<HTML
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Page one</td>
-                    <td>Complete</td>
-                </tr>
-            </tbody>
-        </table>
-        HTML,
-        );
-
-        $this->assertSame(
-            <<<'MARKDOWN'
-        | Name | Status |
-        |---|---|
-        | Page one | Complete |
-        MARKDOWN,
-            $result
-        );
+        $this->converter = ConfluenceContentConverterFactory::create();
     }
 
-    private function createConfluenceContentConverter(): ConfluenceContentConverter
+    #[Test]
+    public function itConvertsBasicHtmlToMarkdown(): void
     {
-        return ConfluenceContentConverterFactory::create();
+        $html = $this->fixture('basic-content.html');
+        $expected = rtrim($this->fixture('basic-content.md'), "\r\n");
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame($expected, $actual);
+    }
+
+    #[Test]
+    public function itConvertsHtmlTablesToMarkdownTables(): void
+    {
+        $html = $this->fixture('table.html');
+        $expected = $this->fixture('table.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(trim($expected), trim($actual));
+    }
+
+    #[Test]
+    public function itPreservesNestedLists(): void
+    {
+        $html = $this->fixture('nested-list.html');
+        $expected = $this->fixture('nested-list.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame($expected, $actual);
+    }
+
+    #[Test]
+    public function itConvertsCodeBlocks(): void
+    {
+        $html = $this->fixture('code-block.html');
+        $expected = $this->fixture('code-block.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame($expected, $actual);
+    }
+
+    #[Test]
+    public function itConvertsExternalLinks(): void
+    {
+        $html = $this->fixture('external-link.html');
+        $expected = $this->fixture('external-link.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame($expected, $actual);
+    }
+
+    #[Test]
+    public function itConvertsRenderedConfluencePage(): void
+    {
+        $html = $this->fixture('realistic-page.html');
+        $expected = $this->fixture('realistic-page.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame($expected, $actual);
     }
 }

@@ -20,6 +20,8 @@ final readonly class ConfluenceContentConverter
 
     public function toMarkdown(string $content): string
     {
-        return $this->htmlConverter->convert($content);
+        $markdown = $this->htmlConverter->convert($content);
+
+        return preg_replace('/^[\t ]+$/m', '', $markdown) ?? $markdown;
     }
 }
