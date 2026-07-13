@@ -115,6 +115,34 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    #[Test]
+    public function itConvertsBlockquotes(): void
+    {
+        $html = $this->fixture('blockquote.html');
+        $expected = $this->fixture('blockquote.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
+    #[Test]
+    public function itConvertsHorizontalRule(): void
+    {
+        $html = $this->fixture('hr.html');
+        $expected = $this->fixture('hr.md');
+
+        $actual = $this->converter->toMarkdown($html);
+
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
+
     private function normaliseMarkdown(string $content): string
     {
         $content = str_replace("\r\n", "\n", $content);
