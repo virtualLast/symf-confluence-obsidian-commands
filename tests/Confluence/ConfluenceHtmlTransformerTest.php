@@ -36,4 +36,71 @@ HTML;
             $transformed,
         );
     }
+
+    #[Test]
+    public function itWrapsStandaloneLinksInParagraphs(): void
+    {
+        // Arrange
+        $html = <<<'HTML'
+<div class="innerCell">
+    <a
+        class="external-link"
+        href="https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641"
+    >https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641</a>
+    <p>
+        <a href="https://example.com/questions">Questions for Tesco</a>
+    </p>
+</div>
+HTML;
+
+        // Act
+        $transformed = $this->htmlTransformer->transform($html);
+
+        // Assert
+        self::assertStringContainsString(
+            '<p><a class="external-link" href="https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641">'
+            . 'https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641'
+            . '</a></p>',
+            $transformed,
+        );
+
+        self::assertStringContainsString(
+            '<p>'
+            . "\n"
+            . '        <a href="https://example.com/questions">Questions for Tesco</a>'
+            . "\n"
+            . '    </p>',
+            $transformed,
+        );
+    }
+
+    #[Test]
+    public function itDoesNotWrapLinksAlreadyInsideParagraphs(): void
+    {
+        // Arrange
+        $html = <<<'HTML'
+<p>
+    Read the <a href="https://example.com/docs">documentation</a>.
+</p>
+HTML;
+
+        // Act
+        $transformed = $this->htmlTransformer->transform($html);
+
+        // Assert
+        self::assertStringContainsString(
+            '<p>'
+            . "\n"
+            . '    Read the <a href="https://example.com/docs">documentation</a>.'
+            . "\n"
+            . '</p>',
+            $transformed,
+        );
+
+        self::assertStringNotContainsString(
+            '<p><p>',
+            $transformed,
+        );
+    }
+
 }

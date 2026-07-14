@@ -169,4 +169,31 @@ final class ConfluenceContentConverterTest extends TestCase
 
         return trim($content);
     }
+
+    #[Test]
+    public function itSeparatesStandaloneLinksFromFollowingLinks(): void
+    {
+        // Arrange
+        $html = <<<'HTML'
+<div class="innerCell">
+    <a class="external-link" href="https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641">https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641</a>
+    <p><a href="https://example.com/questions">Questions for Tesco</a></p>
+</div>
+HTML;
+
+        $expected = <<<'MARKDOWN'
+<https://github.com/AshwoodsLightfoot/Gen2-ExternalAPI/pull/641>
+
+[Questions for Tesco](https://example.com/questions)
+MARKDOWN;
+
+        // Act
+        $actual = $this->converter->toMarkdown($html);
+
+        // Assert
+        self::assertSame(
+            $this->normaliseMarkdown($expected),
+            $this->normaliseMarkdown($actual),
+        );
+    }
 }

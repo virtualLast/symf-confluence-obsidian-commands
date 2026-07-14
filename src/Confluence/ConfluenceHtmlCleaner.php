@@ -4,7 +4,7 @@ namespace App\Confluence;
 
 use DOMXPath;
 
-final class ConfluenceHtmlCleaner extends AbstractConfluenceDomDocument
+final class ConfluenceHtmlCleaner extends AbstractConfluenceCleaner
 {
 
     /**
@@ -50,7 +50,7 @@ final class ConfluenceHtmlCleaner extends AbstractConfluenceDomDocument
     /**
      * Removes every element matching the supplied XPath expression.
      */
-    private function removeElements(
+    protected function removeElements(
         DOMXPath $xpath,
         string $expression,
     ): void {

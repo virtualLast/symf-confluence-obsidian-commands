@@ -17,6 +17,7 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
         $xpath = new DOMXPath($document);
 
         $this->wrapTopLevelAnchors($xpath);
+        $this->wrapStandaloneLinks($xpath);
 
         return $this->innerHtml($document->documentElement);
     }
@@ -52,6 +53,32 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
 
             $parent->replaceChild($paragraph, $anchor);
             $paragraph->appendChild($anchor);
+        }
+    }
+
+    /**
+     * Wraps links that are direct children of div elements in paragraphs.
+     */
+    private function wrapStandaloneLinks(DOMXPath $xpath): void
+    {
+        $nodes = $xpath->query('//div/a');
+
+        if ($nodes === false) {
+            return;
+        }
+
+        foreach (iterator_to_array($nodes) as $link) {
+            $parent = $link->parentNode;
+            $document = $link->ownerDocument;
+
+            if ($parent === null || $document === null) {
+                continue;
+            }
+
+            $paragraph = $document->createElement('p');
+
+            $parent->replaceChild($paragraph, $link);
+            $paragraph->appendChild($link);
         }
     }
 }
