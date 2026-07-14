@@ -18,23 +18,41 @@ final readonly class ObsidianWriter
     ) {
     }
 
-    public function write(ImportedPage $page): string
-    {
-        $filePath = $this->buildFilePath($page);
-        $this->filesystem->dumpFile($filePath, $page->content);
+    public function write(
+        ImportedPage $page,
+        string $destination = '',
+    ): string {
+        $filePath = $this->buildFilePath(
+            $page,
+            $destination,
+        );
+
+        $this->filesystem->dumpFile(
+            $filePath,
+            $page->content,
+        );
 
         return $filePath;
     }
 
-    private function buildFilePath(ImportedPage $page): string
-    {
-        $filename = $this->makeFilename($page->title);
+    private function buildFilePath(
+        ImportedPage $page,
+        string $destination = '',
+    ): string {
+        $path = rtrim($this->vaultPath, DIRECTORY_SEPARATOR);
+
+        if ($destination !== '') {
+            $path .= DIRECTORY_SEPARATOR . trim(
+                    $destination,
+                    DIRECTORY_SEPARATOR,
+                );
+        }
 
         return sprintf(
             '%s%s%s.md',
-            rtrim($this->vaultPath, DIRECTORY_SEPARATOR),
+            $path,
             DIRECTORY_SEPARATOR,
-            $filename,
+            $this->makeFilename($page->title),
         );
     }
 
