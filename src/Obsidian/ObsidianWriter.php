@@ -19,8 +19,6 @@ final readonly class ObsidianWriter
     public function write(ImportedPage $page): string
     {
         $filePath = $this->buildFilePath($page);
-
-        $this->filesystem->mkdir($this->vaultPath);
         $this->filesystem->dumpFile($filePath, $page->content);
 
         return $filePath;
