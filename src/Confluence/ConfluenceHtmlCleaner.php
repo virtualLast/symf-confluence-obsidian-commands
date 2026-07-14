@@ -36,6 +36,12 @@ final class ConfluenceHtmlCleaner
             '//*[contains(concat(" ", normalize-space(@class), " "), " expand-control ")]',
         );
 
+        // Remove empty paragraphs that contain no text or child elements.
+        $this->removeElements(
+            $xpath,
+            '//p[not(node()) or normalize-space(.) = ""]',
+        );
+
         return $this->innerHtml($document->documentElement);
     }
 
