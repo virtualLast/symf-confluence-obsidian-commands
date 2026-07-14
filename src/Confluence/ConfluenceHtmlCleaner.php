@@ -30,6 +30,11 @@ final class ConfluenceHtmlCleaner
             '//img[contains(concat(" ", normalize-space(@class), " "), " unknown-attachment ")]',
         );
 
+        $this->removeElements(
+            $xpath,
+            '//img[contains(@src, "/placeholder/unknown-attachment")]'
+        );
+
         // Remove the expand/collapse control while preserving the expanded content.
         $this->removeElements(
             $xpath,
@@ -61,7 +66,7 @@ final class ConfluenceHtmlCleaner
         try {
             $document->loadHTML(
                 sprintf(
-                    '<!DOCTYPE html><html><body><div id="%s">%s</div></body></html>',
+                    '<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="%s">%s</div></body></html>',
                     self::FRAGMENT_ROOT_ID,
                     $html,
                 ),

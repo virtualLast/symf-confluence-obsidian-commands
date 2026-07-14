@@ -69,6 +69,33 @@ HTML;
     }
 
     #[Test]
+    public function itRemovesAttachmentPlaceholderImagesByUrl(): void
+    {
+        // Arrange
+        $dirty = <<<'HTML'
+<p>Before</p>
+<img
+    class="confluence-embedded-image image-center"
+    alt="example.png"
+    src="https://example.atlassian.net/wiki/plugins/servlet/confluence/placeholder/unknown-attachment?locale=en_US&amp;version=2"
+>
+<p>After</p>
+HTML;
+
+        // Act
+        $clean = $this->cleaner->clean($dirty);
+
+        // Assert
+        self::assertStringNotContainsString(
+            '/placeholder/unknown-attachment',
+            $clean,
+        );
+
+        self::assertStringContainsString('<p>Before</p>', $clean);
+        self::assertStringContainsString('<p>After</p>', $clean);
+    }
+
+    #[Test]
     public function itRemovesExpandControls(): void
     {
         // Arrange
@@ -130,5 +157,25 @@ HTML;
             '<p>Deploy McBain before the Portal.</p>',
             $clean,
         );
+    }
+
+    #[Test]
+    public function itPreservesUtf8Characters(): void
+    {
+        // Arrange
+        $dirty = <<<'HTML'
+<p>User’s identity → application — end-to-end.</p>
+HTML;
+
+        // Act
+        $clean = $this->cleaner->clean($dirty);
+
+        // Assert
+        self::assertStringContainsString(
+            'User’s identity → application — end-to-end.',
+            $clean,
+        );
+
+        self::assertStringNotContainsString('â', $clean);
     }
 }
