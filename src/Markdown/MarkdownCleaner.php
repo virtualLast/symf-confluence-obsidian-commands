@@ -11,105 +11,126 @@ final class MarkdownCleaner
         }
 
         $lines = $this->splitIntoLines($markdown);
+        $cleanedLines = $this->collapseExcessiveBlankLines($lines);
 
-        $cleaned = '';
-        $insideFence = false;
-        $fenceCharacter = null;
-        $fenceLength = null;
-        $blankLinePending = false;
-
-        foreach ($lines as [$content, $lineEnding]) {
-            if ($insideFence) {
-                $cleaned .= $content . $lineEnding;
-
-                if (
-                    $fenceCharacter !== null
-                    && $fenceLength !== null
-                    && $this->isClosingFence(
-                        $content,
-                        $fenceCharacter,
-                        $fenceLength,
-                    )
-                ) {
-                    $insideFence = false;
-                    $fenceCharacter = null;
-                    $fenceLength = null;
-                }
-
-                continue;
-            }
-
-            $openingFence = $this->openingFence($content);
-
-            if ($openingFence !== null) {
-                if ($blankLinePending) {
-                    $cleaned .= $blankLinePending;
-                    $blankLinePending = false;
-                }
-
-                $cleaned .= $content . $lineEnding;
-
-                $insideFence = true;
-                $fenceCharacter = $openingFence['character'];
-                $fenceLength = $openingFence['length'];
-
-                continue;
-            }
-
-            if (trim($content) === '') {
-                if ($blankLinePending === false) {
-                    $blankLinePending = $content . $lineEnding;
-                }
-
-                continue;
-            }
-
-            if ($blankLinePending !== false) {
-                $cleaned .= $blankLinePending;
-                $blankLinePending = false;
-            }
-
-            $cleaned .= $content . $lineEnding;
-        }
-
-        if ($blankLinePending !== false) {
-            $cleaned .= $blankLinePending;
-        }
-
-        return $cleaned;
+        return implode('', $cleanedLines);
     }
 
     /**
-     * @return list<array{0: string, 1: string}>
+     * Splits Markdown into complete lines while retaining line endings.
+     *
+     * Retaining the line endings allows the cleaner to reconstruct the input
+     * without changing LF or CRLF formatting.
+     *
+     * @return list<string>
      */
     private function splitIntoLines(string $markdown): array
     {
-        $parts = preg_split(
-            '/(\r\n|\n|\r)/',
+        $lines = preg_split(
+            '/(?<=\r\n)|(?<=\n)|(?<=\r)/',
             $markdown,
-            flags: PREG_SPLIT_DELIM_CAPTURE,
         );
 
-        if ($parts === false) {
-            return [[$markdown, '']];
+        if ($lines === false) {
+            return [$markdown];
         }
 
-        $lines = [];
+        return array_values(
+            array_filter(
+                $lines,
+                static fn (string $line): bool => $line !== '',
+            ),
+        );
+    }
 
-        for ($index = 0; $index < count($parts); $index += 2) {
-            $lines[] = [
-                $parts[$index],
-                $parts[$index + 1] ?? '',
-            ];
+    /**
+     * Collapses consecutive blank lines outside fenced code blocks.
+     *
+     * The first blank line is retained. Any further consecutive blank lines
+     * are discarded. Content inside fenced code blocks is copied unchanged.
+     *
+     * @param list<string> $lines
+     *
+     * @return list<string>
+     */
+    private function collapseExcessiveBlankLines(array $lines): array
+    {
+        $cleanedLines = [];
+        $pendingBlankLine = null;
+        $openFence = null;
+
+        foreach ($lines as $line) {
+            if ($openFence !== null) {
+                $cleanedLines[] = $line;
+
+                if ($this->closesFence($line, $openFence)) {
+                    $openFence = null;
+                }
+
+                continue;
+            }
+
+            $openingFence = $this->findOpeningFence($line);
+
+            if ($openingFence !== null) {
+                $this->appendPendingBlankLine(
+                    $cleanedLines,
+                    $pendingBlankLine,
+                );
+
+                $cleanedLines[] = $line;
+                $openFence = $openingFence;
+
+                continue;
+            }
+
+            if ($this->isBlankLine($line)) {
+                // Retain only the first blank line in a consecutive sequence.
+                $pendingBlankLine ??= $line;
+
+                continue;
+            }
+
+            $this->appendPendingBlankLine(
+                $cleanedLines,
+                $pendingBlankLine,
+            );
+
+            $cleanedLines[] = $line;
         }
 
-        return $lines;
+        $this->appendPendingBlankLine(
+            $cleanedLines,
+            $pendingBlankLine,
+        );
+
+        return $cleanedLines;
+    }
+
+    /**
+     * @param list<string> $cleanedLines
+     */
+    private function appendPendingBlankLine(
+        array &$cleanedLines,
+        ?string &$pendingBlankLine,
+    ): void {
+        if ($pendingBlankLine === null) {
+            return;
+        }
+
+        $cleanedLines[] = $pendingBlankLine;
+        $pendingBlankLine = null;
+    }
+
+    private function isBlankLine(string $line): bool
+    {
+        return trim($line) === '';
     }
 
     /**
      * @return array{character: string, length: int}|null
      */
-    private function openingFence(string $line): ?array
+    private function findOpeningFence(string $line): ?array
     {
         if (
             preg_match(
@@ -127,18 +148,23 @@ final class MarkdownCleaner
         ];
     }
 
-    private function isClosingFence(
+    /**
+     * @param array{character: string, length: int} $openFence
+     */
+    private function closesFence(
         string $line,
-        string $fenceCharacter,
-        int $minimumLength,
+        array $openFence,
     ): bool {
-        $quotedCharacter = preg_quote($fenceCharacter, '/');
+        $character = preg_quote(
+            $openFence['character'],
+            '/',
+        );
 
         return preg_match(
                 sprintf(
-                    '/^ {0,3}%s{%d,}[ \t]*$/',
-                    $quotedCharacter,
-                    $minimumLength,
+                    '/^ {0,3}%s{%d,}[ \t]*(?:\r\n|\n|\r)?$/',
+                    $character,
+                    $openFence['length'],
                 ),
                 $line,
             ) === 1;
