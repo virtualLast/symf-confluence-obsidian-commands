@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "64d39dc5445b517962aa757ceabaa221",
+    "content-hash": "3138006c5e8d5a58756016b71d7c1cf3",
     "packages": [
         {
             "name": "cloudplaydev/confluence-php-client",
@@ -6090,7 +6090,9 @@
     "platform": {
         "php": ">=8.4",
         "ext-ctype": "*",
-        "ext-iconv": "*"
+        "ext-dom": "*",
+        "ext-iconv": "*",
+        "ext-libxml": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"
