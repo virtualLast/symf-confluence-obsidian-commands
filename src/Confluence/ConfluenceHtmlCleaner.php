@@ -41,7 +41,7 @@ final class ConfluenceHtmlCleaner extends AbstractConfluenceDomDocument
         // Remove empty paragraphs that contain no text or child elements.
         $this->removeElements(
             $xpath,
-            '//p[not(node()) or normalize-space(.) = ""]',
+            '//p[not(*) and normalize-space(.) = ""]',
         );
 
         return $this->innerHtml($document->documentElement);
