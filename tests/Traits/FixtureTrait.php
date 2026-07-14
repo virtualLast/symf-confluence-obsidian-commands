@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Tests\Confluence;
+namespace App\Tests\Traits;
 
-trait ConfluenceFixtureTrait
+trait FixtureTrait
 {
     private function fixture(string $filename): string
     {

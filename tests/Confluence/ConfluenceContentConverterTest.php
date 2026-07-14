@@ -3,12 +3,13 @@
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceContentConverter;
+use App\Tests\Traits\FixtureTrait;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 final class ConfluenceContentConverterTest extends TestCase
 {
-    use ConfluenceFixtureTrait;
+    use FixtureTrait;
 
     private ConfluenceContentConverter $converter;
 
