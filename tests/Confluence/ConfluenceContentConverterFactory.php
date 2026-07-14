@@ -3,6 +3,8 @@
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceContentConverter;
+use App\Confluence\ConfluenceHtmlCleaner;
+use App\Confluence\ConfluenceHtmlTransformer;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 
@@ -22,6 +24,6 @@ final class ConfluenceContentConverterFactory
             ->getEnvironment()
             ->addConverter(new TableConverter());
 
-        return new ConfluenceContentConverter($htmlConverter);
+        return new ConfluenceContentConverter(new ConfluenceHtmlCleaner(), new ConfluenceHtmlTransformer(),$htmlConverter);
     }
 }

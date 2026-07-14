@@ -10,6 +10,7 @@ final readonly class ConfluenceContentConverter
 
     public function __construct(
         private ConfluenceHtmlCleaner $htmlCleaner,
+        private ConfluenceHtmlTransformer $htmlTransformer,
         private HtmlConverter $htmlConverter,
     ) {
         $this->htmlConverter
@@ -23,7 +24,9 @@ final readonly class ConfluenceContentConverter
     public function toMarkdown(string $content): string
     {
         $cleanHtml = $this->htmlCleaner->clean($content);
-        $markdown = $this->htmlConverter->convert($cleanHtml);
+        $transformedHtml = $this->htmlTransformer->transform($cleanHtml);
+
+        $markdown = $this->htmlConverter->convert($transformedHtml);
 
         return $this->removeLinesWithEmptySpace($markdown);
     }

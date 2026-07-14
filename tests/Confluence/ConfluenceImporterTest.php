@@ -7,7 +7,6 @@ use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
-use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use PHPUnit\Framework\TestCase;
 
 class ConfluenceImporterTest extends TestCase
