@@ -3,6 +3,7 @@
 namespace App\Obsidian;
 
 use App\Model\ImportedPage;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -10,6 +11,7 @@ final readonly class ObsidianWriter
 {
 
     public function __construct(
+        #[Autowire(env: 'OBSIDIAN_VAULT')]
         private string $vaultPath,
         private SluggerInterface $slugger,
         private Filesystem $filesystem
