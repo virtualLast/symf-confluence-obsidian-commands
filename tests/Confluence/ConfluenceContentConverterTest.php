@@ -18,6 +18,11 @@ final class ConfluenceContentConverterTest extends TestCase
         $this->converter = ConfluenceContentConverterFactory::create();
     }
 
+    /**
+     * What: Basic Confluence HTML is converted into the expected Markdown.
+     * How: The basic HTML fixture is converted and compared with its normalised Markdown fixture.
+     * Why: Common headings and paragraphs must survive the central import conversion path.
+     */
     #[Test]
     public function itConvertsBasicHtmlToMarkdown(): void
     {
@@ -32,6 +37,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: Mixed inline and block formatting converts correctly in one document.
+     * How: A representative mixed-format fixture is compared with its expected Markdown output.
+     * Why: Real Confluence pages combine formats whose conversion rules can interact.
+     */
     #[Test]
     public function itConvertsMixedFormatting(): void
     {
@@ -46,6 +56,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: HTML tables become structurally equivalent Markdown tables.
+     * How: A table fixture is converted and compared with the expected normalised Markdown.
+     * Why: Tabular Confluence content must remain readable and organised after import.
+     */
     #[Test]
     public function itConvertsHtmlTablesToMarkdownTables(): void
     {
@@ -60,6 +75,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: Nested list hierarchy is retained during conversion.
+     * How: Nested-list HTML and Markdown fixtures are converted, normalised, and compared.
+     * Why: Losing indentation would change the meaning and grouping of imported list items.
+     */
     #[Test]
     public function itPreservesNestedLists(): void
     {
@@ -74,6 +94,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: External HTML anchors are emitted as Markdown links.
+     * How: An external-link fixture is converted and matched against the expected Markdown.
+     * Why: Imported documentation must retain navigable references to external resources.
+     */
     #[Test]
     public function itConvertsExternalLinks(): void
     {
@@ -88,6 +113,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: HTML code blocks are converted to Markdown fenced code blocks.
+     * How: The code-block fixture is converted and compared with its expected Markdown fixture.
+     * Why: Source examples must retain their block structure and formatting after import.
+     */
     #[Test]
     public function itConvertsCodeBlocks(): void
     {
@@ -102,6 +132,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: Inline code remains inline code in the generated Markdown.
+     * How: An inline-code fixture is converted and compared with the expected output.
+     * Why: Commands and identifiers embedded in prose must remain visually distinct.
+     */
     #[Test]
     public function itPreservesInlineCode(): void
     {
@@ -116,6 +151,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: HTML images are represented with the expected Markdown image syntax.
+     * How: The image fixture is converted and compared with its normalised Markdown counterpart.
+     * Why: Visual references and their metadata must not disappear from imported pages.
+     */
     #[Test]
     public function itConvertsImages(): void
     {
@@ -130,6 +170,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: HTML blockquotes are converted to Markdown blockquotes.
+     * How: A blockquote fixture is converted and compared with the expected Markdown.
+     * Why: Quoted content must preserve its semantic distinction from surrounding prose.
+     */
     #[Test]
     public function itConvertsBlockquotes(): void
     {
@@ -144,6 +189,11 @@ final class ConfluenceContentConverterTest extends TestCase
         );
     }
 
+    /**
+     * What: An HTML horizontal rule becomes its Markdown equivalent.
+     * How: The rule fixture is converted and compared with the expected normalised output.
+     * Why: Section boundaries should remain visible in imported documentation.
+     */
     #[Test]
     public function itConvertsHorizontalRule(): void
     {
@@ -171,6 +221,11 @@ final class ConfluenceContentConverterTest extends TestCase
         return trim($content);
     }
 
+    /**
+     * What: A standalone URL and a following named link remain separate Markdown blocks.
+     * How: Adjacent link shapes are converted and their exact normalised output is asserted.
+     * Why: Without separation, unrelated links can collapse onto one line and become ambiguous.
+     */
     #[Test]
     public function itSeparatesStandaloneLinksFromFollowingLinks(): void
     {

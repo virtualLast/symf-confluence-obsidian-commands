@@ -15,6 +15,11 @@ final class ConfluenceHtmlCleanerTest extends TestCase
         $this->cleaner = new ConfluenceHtmlCleaner();
     }
 
+    /**
+     * What: Embedded style elements are removed from Confluence HTML.
+     * How: HTML containing a style block is cleaned and compared with the content-only result.
+     * Why: Page-level CSS is irrelevant to Markdown and could leak unwanted text into conversion.
+     */
     #[Test]
     public function itRemovesStyleElements(): void
     {
@@ -28,6 +33,11 @@ final class ConfluenceHtmlCleanerTest extends TestCase
         self::assertSame($expected, $clean);
     }
 
+    /**
+     * What: Empty Confluence paragraphs are removed while neighbouring content remains.
+     * How: A self-closing empty paragraph between two populated paragraphs is cleaned and inspected.
+     * Why: Placeholder paragraphs create noise and excess spacing in generated Markdown.
+     */
     #[Test]
     public function itRemovesEmptyParagraphs(): void
     {
@@ -40,6 +50,11 @@ final class ConfluenceHtmlCleanerTest extends TestCase
         self::assertStringContainsString('<p>After</p>', $clean);
     }
 
+    /**
+     * What: Unknown-attachment image wrappers and placeholders are removed.
+     * How: A class-marked placeholder between paragraphs is cleaned and its absence is asserted.
+     * Why: Broken Confluence attachment markers should not become broken images in Obsidian.
+     */
     #[Test]
     public function itRemovesUnknownAttachmentImages(): void
     {
@@ -68,6 +83,11 @@ HTML;
         self::assertStringContainsString('<p>After</p>', $clean);
     }
 
+    /**
+     * What: Attachment placeholders are detected and removed by URL as well as by class.
+     * How: A normally classed image with an unknown-attachment URL is cleaned and inspected.
+     * Why: Confluence does not always apply the marker class, so URL detection prevents leaks.
+     */
     #[Test]
     public function itRemovesAttachmentPlaceholderImagesByUrl(): void
     {
@@ -95,6 +115,11 @@ HTML;
         self::assertStringContainsString('<p>After</p>', $clean);
     }
 
+    /**
+     * What: Decorative controls for expandable Confluence sections are removed.
+     * How: An expand container is cleaned and its label, icon, and control markup are checked.
+     * Why: Static Markdown cannot use Confluence's interactive controls and should omit their clutter.
+     */
     #[Test]
     public function itRemovesExpandControls(): void
     {
@@ -125,6 +150,11 @@ HTML;
         self::assertStringNotContainsString('grey_arrow_down.png', $clean);
     }
 
+    /**
+     * What: Content revealed by an expandable Confluence section is preserved.
+     * How: The container is cleaned and its heading, paragraph, and content wrapper are asserted.
+     * Why: Removing the interactive control must not also discard useful documentation.
+     */
     #[Test]
     public function itPreservesExpandedContent(): void
     {
@@ -159,6 +189,11 @@ HTML;
         );
     }
 
+    /**
+     * What: UTF-8 punctuation survives HTML cleaning without mojibake.
+     * How: Curly punctuation, an arrow, and an em dash are cleaned and checked exactly.
+     * Why: Imported documentation must preserve human-readable international text and symbols.
+     */
     #[Test]
     public function itPreservesUtf8Characters(): void
     {

@@ -12,12 +12,9 @@ use PHPUnit\Framework\TestCase;
 class ConfluenceImporterTest extends TestCase
 {
     /**
-     * what: Given includeChildren is false when importing a page,
-     *  then the importer fetches the page and does not fetch children
-     *  and returns the page
-     * why: we need to confirm that we can successfully import a page
-     * how: mock a page and client and assert the page mock and imported page are the same
-     * @return void
+     * What: Importing one page fetches that page, not its children, and maps its fields.
+     * How: Client and page doubles define the response, calls, and expected ImportedPage values.
+     * Why: A single-page import must remain scoped and faithfully transfer the source data.
      */
     public function testImportPageFetchesPageFromConfluence(): void
     {
@@ -66,10 +63,9 @@ class ConfluenceImporterTest extends TestCase
     }
 
     /**
-     * what: tests that the HTML content is converted to Markdown
-     * why: To ensure that the importer correctly converts HTML content to Markdown
-     * how: By mocking the ConfluenceClient and asserting that the expected methods are called with the correct parameters
-     * @return void
+     * What: Confluence HTML content is converted into the expected Markdown representation.
+     * How: The real conversion pipeline processes a heading and bold paragraph for exact comparison.
+     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
      */
     public function testConvertsHtmlContentToMarkdown(): void
     {

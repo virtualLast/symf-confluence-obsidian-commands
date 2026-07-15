@@ -16,6 +16,11 @@ class ConfluenceHtmlTransformerTest extends TestCase
         $this->htmlTransformer = new ConfluenceHtmlTransformer();
     }
 
+    /**
+     * What: Top-level anchors are wrapped in paragraphs before Markdown conversion.
+     * How: A root anchor followed by a paragraph is transformed and both structures are asserted.
+     * Why: Paragraph wrapping prevents standalone links from merging with neighbouring content.
+     */
     #[Test]
     public function itWrapsTopLevelAnchorsInParagraphs(): void
     {
@@ -37,6 +42,11 @@ HTML;
         );
     }
 
+    /**
+     * What: A standalone link inside a container receives its own paragraph.
+     * How: Mixed standalone and already-wrapped links are transformed and inspected independently.
+     * Why: Each logical link block needs separation for predictable Markdown output.
+     */
     #[Test]
     public function itWrapsStandaloneLinksInParagraphs(): void
     {
@@ -74,6 +84,11 @@ HTML;
         );
     }
 
+    /**
+     * What: Links already contained in paragraphs are not wrapped a second time.
+     * How: An inline link is transformed and checked for preserved markup and no nested paragraph.
+     * Why: Double wrapping creates invalid HTML and can corrupt downstream Markdown conversion.
+     */
     #[Test]
     public function itDoesNotWrapLinksAlreadyInsideParagraphs(): void
     {

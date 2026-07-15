@@ -18,6 +18,11 @@ class MarkdownCleanerTest extends TestCase
         $this->cleaner = new MarkdownCleaner();
     }
 
+    /**
+     * What: Markdown whitespace is cleaned without changing fenced code blocks.
+     * How: Fixture pairs cover excess blanks and several closed and unclosed fence styles.
+     * Why: Imported prose needs consistent spacing while code must retain its original layout.
+     */
     #[DataProvider('cleaningFixtureProvider')]
     public function testItCleansMarkdown(
         string $inputFixture,

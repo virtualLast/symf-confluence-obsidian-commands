@@ -35,6 +35,11 @@ final class ImportConfluenceCommandTest extends TestCase
         $this->filesystem->remove($this->vaultPath);
     }
 
+    /**
+     * What: The command imports a Confluence page into the vault root.
+     * How: A mocked importer returns a page, then the command's file and output are inspected.
+     * Why: The primary command path must persist the requested page and report its location.
+     */
     public function testItImportsAPageIntoTheVault(): void
     {
         $importedPage = new ImportedPage(
@@ -84,6 +89,11 @@ final class ImportConfluenceCommandTest extends TestCase
         );
     }
 
+    /**
+     * What: The command honours a nested destination supplied by the user.
+     * How: The command is executed with a destination and the resulting file path and content are checked.
+     * Why: Users need to place imported pages into the correct area of an Obsidian vault.
+     */
     public function testItImportsAPageIntoTheRequestedDestination(): void
     {
         $importedPage = new ImportedPage(
@@ -130,6 +140,11 @@ final class ImportConfluenceCommandTest extends TestCase
         );
     }
 
+    /**
+     * What: The command fails cleanly when Confluence cannot supply the requested page.
+     * How: The importer mock throws an exception and the exit code and displayed error are asserted.
+     * Why: Import failures must be visible to both users and scripts instead of appearing successful.
+     */
     public function testItReturnsFailureWhenThePageCannotBeImported(): void
     {
         $confluenceImporter = $this->createMock(
@@ -160,6 +175,11 @@ final class ImportConfluenceCommandTest extends TestCase
         );
     }
 
+    /**
+     * What: The command fails cleanly when the imported page cannot be written.
+     * How: A file is placed where the vault directory should be, forcing the writer to fail.
+     * Why: Filesystem errors must produce a non-zero result and an actionable message.
+     */
     public function testItReturnsFailureWhenThePageCannotBeWritten(): void
     {
         /*

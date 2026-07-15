@@ -30,6 +30,11 @@ final class ObsidianWriterTest extends TestCase
         $this->filesystem->remove($this->vaultPath);
     }
 
+    /**
+     * What: An imported page is written as Markdown at the vault root.
+     * How: A page is written and its returned path, existence, and exact content are asserted.
+     * Why: Persisting converted pages is the writer's core responsibility.
+     */
     public function testItWritesAnImportedPageToTheVault(): void
     {
         $writer = $this->createWriter();
@@ -55,6 +60,11 @@ final class ObsidianWriterTest extends TestCase
         );
     }
 
+    /**
+     * What: An imported page can be written beneath a nested vault destination.
+     * How: A multi-level destination is passed and the final path and content are inspected.
+     * Why: Vault users organise notes into folders rather than storing every page at the root.
+     */
     public function testItWritesAnImportedPageToADestinationDirectory(): void
     {
         $writer = $this->createWriter();
@@ -92,6 +102,11 @@ final class ObsidianWriterTest extends TestCase
         );
     }
 
+    /**
+     * What: Missing destination directories are created automatically.
+     * How: A page is written to a nonexistent nested path and both directory and file are checked.
+     * Why: Imports should work without requiring users to prepare the vault structure manually.
+     */
     public function testItCreatesMissingDestinationDirectories(): void
     {
         $writer = $this->createWriter();
@@ -118,6 +133,11 @@ final class ObsidianWriterTest extends TestCase
         self::assertFileExists($filePath);
     }
 
+    /**
+     * What: Page titles are converted into safe, predictable Markdown filenames.
+     * How: A title containing punctuation and an ampersand is written and its path is asserted.
+     * Why: Confluence titles may contain characters unsuitable for consistent vault filenames.
+     */
     public function testItSlugifiesThePageTitle(): void
     {
         $writer = $this->createWriter();
@@ -138,6 +158,11 @@ final class ObsidianWriterTest extends TestCase
         );
     }
 
+    /**
+     * What: Re-importing a page replaces the existing Markdown content.
+     * How: Two versions with the same title are written and the file is checked for the update.
+     * Why: Repeated imports must refresh stale notes instead of preserving obsolete content.
+     */
     public function testItOverwritesAnExistingPage(): void
     {
         $writer = $this->createWriter();
@@ -164,6 +189,11 @@ final class ObsidianWriterTest extends TestCase
         );
     }
 
+    /**
+     * What: Leading and trailing directory separators are normalised in destinations.
+     * How: A separator-wrapped folder is passed and the returned path and file are checked.
+     * Why: Minor path formatting differences must not create malformed or misplaced notes.
+     */
     public function testItHandlesDestinationSeparatorsAtTheEdges(): void
     {
         $writer = $this->createWriter();
