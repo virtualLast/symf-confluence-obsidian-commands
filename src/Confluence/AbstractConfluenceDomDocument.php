@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Confluence;
 
 use DOMDocument;
@@ -7,7 +9,6 @@ use DOMElement;
 
 class AbstractConfluenceDomDocument
 {
-
     protected const string FRAGMENT_ROOT_ID = 'confluence-root';
 
     /**

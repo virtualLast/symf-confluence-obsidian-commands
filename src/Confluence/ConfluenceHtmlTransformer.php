@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Confluence;
 
+use DOMNode;
 use DOMXPath;
 
 final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
 {
-
     /**
      * Transforms rendered Confluence HTML into a structure better suited
      * to Markdown conversion.
@@ -39,6 +41,10 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
         }
 
         foreach (iterator_to_array($nodes) as $anchor) {
+            if (!$anchor instanceof DOMNode) {
+                continue;
+            }
+
             $parent = $anchor->parentNode;
 
             if ($parent === null) {
@@ -68,6 +74,10 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
         }
 
         foreach (iterator_to_array($nodes) as $link) {
+            if (!$link instanceof DOMNode) {
+                continue;
+            }
+
             $parent = $link->parentNode;
             $document = $link->ownerDocument;
 

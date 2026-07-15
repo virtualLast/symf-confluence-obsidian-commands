@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Confluence;
 
+use DOMNode;
 use DOMXPath;
 
 final class ConfluenceHtmlCleaner extends AbstractConfluenceCleaner
 {
-
     /**
      * Removes Confluence-specific presentation elements from rendered HTML.
      */
@@ -62,6 +64,10 @@ final class ConfluenceHtmlCleaner extends AbstractConfluenceCleaner
 
         // Copy the nodes first as we're modifying the DOM during iteration.
         foreach (iterator_to_array($nodes) as $node) {
+            if (!$node instanceof DOMNode) {
+                continue;
+            }
+
             $node->parentNode?->removeChild($node);
         }
     }

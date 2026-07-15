@@ -1,17 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Confluence;
 
+use App\Markdown\MarkdownCleaner;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 
 final readonly class ConfluenceContentConverter
 {
-
     public function __construct(
         private ConfluenceHtmlCleaner $htmlCleaner,
         private ConfluenceHtmlTransformer $htmlTransformer,
         private HtmlConverter $htmlConverter,
+        private MarkdownCleaner $markdownCleaner,
     ) {
         $this->htmlConverter
             ->getEnvironment()
@@ -28,12 +31,6 @@ final readonly class ConfluenceContentConverter
 
         $markdown = $this->htmlConverter->convert($transformedHtml);
 
-        return $this->removeLinesWithEmptySpace($markdown);
-    }
-
-    // todo move this into the html cleaner
-    private function removeLinesWithEmptySpace(string $markdown): string
-    {
-        return preg_replace('/^[\t ]+$/m', '', $markdown) ?? $markdown;
+        return $this->markdownCleaner->clean($markdown);
     }
 }

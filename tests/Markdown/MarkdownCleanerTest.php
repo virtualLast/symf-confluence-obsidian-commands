@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Markdown;
 
 use App\Markdown\MarkdownCleaner;
@@ -35,6 +37,23 @@ class MarkdownCleanerTest extends TestCase
         );
     }
 
+    /**
+     * What: Whitespace-only Markdown lines are emptied without changing their line endings.
+     * How: CRLF prose blanks and a whitespace-only fenced-code line are cleaned and compared.
+     * Why: Generated spacing should be clean while code contents and platform endings remain exact.
+     */
+    public function testItNormalisesWhitespaceOnlyLinesOutsideCodeFences(): void
+    {
+        $input = "Before\r\n \t\r\n\r\nAfter\r\n```text\r\n   \r\n```\r\n";
+        $expected = "Before\r\n\r\nAfter\r\n```text\r\n   \r\n```\r\n";
+
+        self::assertSame(
+            $expected,
+            $this->cleaner->clean($input),
+        );
+    }
+
+    /** @return iterable<string, array{string, string}> */
     public static function cleaningFixtureProvider(): iterable
     {
         yield 'excessive blank lines' => [

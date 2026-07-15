@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Confluence;
 
 use App\Model\ImportedPage;
@@ -12,8 +14,7 @@ readonly class ConfluenceImporter
     public function __construct(
         private ConfluenceClient $confluenceClient,
         private ConfluenceContentConverter $confluenceContentConverter,
-    ) {
-    }
+    ) {}
 
     /**
      * @throws Exception
@@ -24,11 +25,21 @@ readonly class ConfluenceImporter
     {
         $page = $this->confluenceClient->getPage($pageId);
 
-        $markdown = $this->confluenceContentConverter->toMarkdown($page->getContent());
+        $importedPageId = $page->getId();
+
+        if ($importedPageId === null) {
+            throw new \UnexpectedValueException(
+                'The Confluence response did not contain a page ID.',
+            );
+        }
+
+        $markdown = $this->confluenceContentConverter->toMarkdown(
+            $page->getContent() ?? '',
+        );
 
         return new ImportedPage(
-            $page->getId(),
-            $page->getTitle(),
+            $importedPageId,
+            $page->getTitle() ?? '',
             $markdown,
         );
     }

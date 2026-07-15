@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Obsidian;
 
 use App\Model\ImportedPage;
@@ -14,6 +16,9 @@ final class ObsidianWriterTest extends TestCase
 
     private Filesystem $filesystem;
 
+    /** @var list<string> */
+    private array $additionalCleanupPaths = [];
+
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
@@ -27,7 +32,10 @@ final class ObsidianWriterTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->filesystem->remove($this->vaultPath);
+        $this->filesystem->remove([
+            $this->vaultPath,
+            ...$this->additionalCleanupPaths,
+        ]);
     }
 
     /**
@@ -48,7 +56,9 @@ final class ObsidianWriterTest extends TestCase
         $filePath = $writer->write($page);
 
         self::assertSame(
-            $this->vaultPath . DIRECTORY_SEPARATOR . 'sso-overview.md',
+            realpath($this->vaultPath)
+            . DIRECTORY_SEPARATOR
+            . 'sso-overview.md',
             $filePath,
         );
 
@@ -84,7 +94,7 @@ final class ObsidianWriterTest extends TestCase
             implode(
                 DIRECTORY_SEPARATOR,
                 [
-                    $this->vaultPath,
+                    realpath($this->vaultPath),
                     'Areas',
                     'Engineering',
                     'SSO',
@@ -123,7 +133,7 @@ final class ObsidianWriterTest extends TestCase
         );
 
         self::assertDirectoryExists(
-            $this->vaultPath
+            realpath($this->vaultPath)
             . DIRECTORY_SEPARATOR
             . 'Projects'
             . DIRECTORY_SEPARATOR
@@ -151,7 +161,7 @@ final class ObsidianWriterTest extends TestCase
         $filePath = $writer->write($page);
 
         self::assertSame(
-            $this->vaultPath
+            realpath($this->vaultPath)
             . DIRECTORY_SEPARATOR
             . 'oauth-oidc-sso-implementation.md',
             $filePath,
@@ -190,11 +200,11 @@ final class ObsidianWriterTest extends TestCase
     }
 
     /**
-     * What: Leading and trailing directory separators are normalised in destinations.
-     * How: A separator-wrapped folder is passed and the returned path and file are checked.
-     * Why: Minor path formatting differences must not create malformed or misplaced notes.
+     * What: Absolute destinations are rejected rather than interpreted beneath the vault.
+     * How: A separator-prefixed destination is passed and an invalid-argument error is expected.
+     * Why: Every generated Markdown file must remain relative to OBSIDIAN_VAULT.
      */
-    public function testItHandlesDestinationSeparatorsAtTheEdges(): void
+    public function testItRejectsAbsoluteDestinations(): void
     {
         $writer = $this->createWriter();
 
@@ -204,24 +214,116 @@ final class ObsidianWriterTest extends TestCase
             content: 'Page content.',
         );
 
-        $filePath = $writer->write(
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must be relative');
+
+        $writer->write(
             $page,
-            DIRECTORY_SEPARATOR . 'Projects' . DIRECTORY_SEPARATOR,
+            DIRECTORY_SEPARATOR . 'Projects',
         );
+    }
+
+    /**
+     * What: Parent-directory traversal cannot escape the configured vault.
+     * How: An existing sibling is targeted with `..` and an invalid-argument error is expected.
+     * Why: Imports must never write Markdown outside OBSIDIAN_VAULT.
+     */
+    public function testItRejectsParentDirectoryTraversal(): void
+    {
+        $writer = $this->createWriter();
+        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+
+        $outsidePath = $this->vaultPath . '-outside';
+        $this->additionalCleanupPaths[] = $outsidePath;
+        $this->filesystem->mkdir($outsidePath);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('unsafe path segment');
+
+        $writer->write($page, '../' . basename($outsidePath));
+    }
+
+    /**
+     * What: Symbolic links cannot redirect a destination outside the vault.
+     * How: A vault symlink points to an external directory and is used as the destination.
+     * Why: Lexically safe paths can still escape the vault when symlinks are followed.
+     */
+    public function testItRejectsSymbolicLinkDestinations(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            self::markTestSkipped('Symlink creation is not reliably available on Windows.');
+        }
+
+        $writer = $this->createWriter();
+        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+        $outsidePath = $this->vaultPath . '-outside';
+        $this->additionalCleanupPaths[] = $outsidePath;
+
+        $this->filesystem->mkdir([$this->vaultPath, $outsidePath]);
+        $this->filesystem->symlink($outsidePath, $this->vaultPath . '/linked');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not contain symbolic links');
+
+        $writer->write($page, 'linked');
+    }
+
+    /**
+     * What: Windows-style separators are handled as relative destination separators.
+     * How: A backslash-delimited path is written and its canonical vault path is asserted.
+     * Why: Destination input should behave consistently across platforms without escaping the vault.
+     */
+    public function testItHandlesMixedDestinationSeparators(): void
+    {
+        $writer = $this->createWriter();
+        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+
+        $filePath = $writer->write($page, 'Areas\\Engineering/SSO');
 
         self::assertSame(
-            implode(
-                DIRECTORY_SEPARATOR,
-                [
-                    $this->vaultPath,
-                    'Projects',
-                    'sso-overview.md',
-                ],
-            ),
+            realpath($this->vaultPath)
+            . '/Areas/Engineering/SSO/sso-overview.md',
             $filePath,
         );
-
         self::assertFileExists($filePath);
+    }
+
+    /**
+     * What: Titles without slug characters receive a dated untitled filename.
+     * How: A punctuation-only title is written and its filename is matched to the fallback format.
+     * Why: Blank filenames must not create a hidden `.md` file or collide immediately.
+     */
+    public function testItUsesADatedFallbackForAnEmptySlug(): void
+    {
+        $writer = $this->createWriter();
+        $page = new ImportedPage(123, '!!!', 'Page content.');
+
+        $filePath = $writer->write($page);
+
+        self::assertMatchesRegularExpression(
+            '/^untitled-\d{2}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.md$/',
+            basename($filePath),
+        );
+        self::assertFileExists($filePath);
+    }
+
+    /**
+     * What: A relative vault configuration is rejected.
+     * How: The writer is constructed with a relative path and asked to persist a page.
+     * Why: Vault containment cannot be guaranteed without an absolute root boundary.
+     */
+    public function testItRejectsARelativeVaultPath(): void
+    {
+        $writer = new ObsidianWriter(
+            vaultPath: 'relative/vault',
+            slugger: new AsciiSlugger(),
+            filesystem: $this->filesystem,
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must be a non-empty absolute path');
+
+        $writer->write(new ImportedPage(123, 'Page', 'Content'));
     }
 
     private function createWriter(): ObsidianWriter

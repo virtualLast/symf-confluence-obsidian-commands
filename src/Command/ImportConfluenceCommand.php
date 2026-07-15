@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
@@ -52,7 +54,26 @@ final class ImportConfluenceCommand extends Command
     ): int {
         $io = new SymfonyStyle($input, $output);
 
-        $pageId = (int) $input->getArgument(self::PAGE_ARGUMENT);
+        $pageArgument = (string) $input->getArgument(self::PAGE_ARGUMENT);
+
+        if (preg_match('/^[1-9]\d*$/', $pageArgument) !== 1) {
+            $io->error('The Confluence page ID must be a positive integer.');
+
+            return Command::INVALID;
+        }
+
+        $pageId = filter_var(
+            $pageArgument,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
+
+        if ($pageId === false) {
+            $io->error('The Confluence page ID is outside the supported integer range.');
+
+            return Command::INVALID;
+        }
+
         $destination = (string) $input->getArgument(
             self::DESTINATION_ARGUMENT,
         );

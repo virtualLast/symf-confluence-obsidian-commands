@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceContentConverter;
@@ -205,6 +207,24 @@ final class ConfluenceContentConverterTest extends TestCase
         self::assertSame(
             $this->normaliseMarkdown($expected),
             $this->normaliseMarkdown($actual),
+        );
+    }
+
+    /**
+     * What: Excessive blank lines created during HTML conversion are collapsed.
+     * How: Consecutive HTML breaks are converted through the complete pipeline and compared exactly.
+     * Why: The Markdown cleaner must affect imported content rather than only passing isolated tests.
+     */
+    #[Test]
+    public function itCleansTheConvertedMarkdown(): void
+    {
+        $actual = $this->converter->toMarkdown(
+            '<p>First paragraph.</p><br><br><br><p>Second paragraph.</p>',
+        );
+
+        self::assertSame(
+            "First paragraph.\n\nSecond paragraph.",
+            $actual,
         );
     }
 

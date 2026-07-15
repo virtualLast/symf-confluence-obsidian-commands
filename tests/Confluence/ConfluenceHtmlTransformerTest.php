@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceHtmlTransformer;
@@ -8,7 +10,6 @@ use PHPUnit\Framework\TestCase;
 
 class ConfluenceHtmlTransformerTest extends TestCase
 {
-
     private ConfluenceHtmlTransformer $htmlTransformer;
 
     public function setUp(): void

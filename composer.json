@@ -1,4 +1,6 @@
 {
+    "name": "lightfoot/confluence-obsidian-importer",
+    "description": "Import Confluence pages into an Obsidian vault as Markdown.",
     "type": "project",
     "license": "proprietary",
     "minimum-stability": "stable",
@@ -24,6 +26,8 @@
         "symfony/yaml": "8.1.*"
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.80",
+        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^13.2",
         "symfony/browser-kit": "8.1.*",
         "symfony/css-selector": "8.1.*",
@@ -61,6 +65,7 @@
         "symfony/polyfill-php84": "*"
     },
     "scripts": {
+        "analyse": "phpstan analyse --debug --no-progress --memory-limit=512M",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd"
@@ -70,6 +75,13 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "format:check": "php-cs-fixer fix --dry-run --diff --sequential",
+        "test": "phpunit",
+        "check": [
+            "@test",
+            "@analyse",
+            "@format:check"
         ]
     },
     "conflict": {

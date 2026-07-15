@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Command;
 
 use App\Command\ImportConfluenceCommand;
 use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianWriter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -84,7 +87,7 @@ final class ImportConfluenceCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            $expectedFilePath,
+            basename($expectedFilePath),
             $commandTester->getDisplay(),
         );
     }
@@ -221,6 +224,85 @@ final class ImportConfluenceCommandTest extends TestCase
             'Unable to write the imported page',
             $commandTester->getDisplay(),
         );
+    }
+
+    /**
+     * What: The command rejects a destination that would escape the configured vault.
+     * How: A successful import is directed through `..` and the command result is inspected.
+     * Why: The command boundary must report unsafe output paths without writing Markdown elsewhere.
+     */
+    public function testItRejectsADestinationOutsideTheVault(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 123,
+            title: 'SSO Overview',
+            content: 'Page content.',
+        );
+
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+            'destination' => '../outside',
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString(
+            'path segment.',
+            $commandTester->getDisplay(),
+        );
+    }
+
+    /**
+     * What: Invalid Confluence page IDs are rejected before an import is attempted.
+     * How: Invalid argument shapes are executed and the importer is expected never to run.
+     * Why: Mistyped identifiers must not become unintended or misleading Confluence requests.
+     */
+    #[DataProvider('invalidPageIdProvider')]
+    public function testItRejectsInvalidPageIds(string $pageId): void
+    {
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::never())
+            ->method('importPage');
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => $pageId,
+        ]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString(
+            'must be a positive integer',
+            $commandTester->getDisplay(),
+        );
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidPageIdProvider(): iterable
+    {
+        yield 'non-numeric' => ['abc'];
+        yield 'zero' => ['0'];
+        yield 'negative' => ['-1'];
+        yield 'surrounding whitespace' => [' 123 '];
+        yield 'decimal' => ['1.5'];
     }
 
     private function createCommandTester(

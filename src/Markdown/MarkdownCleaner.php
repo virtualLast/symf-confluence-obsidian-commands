@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Markdown;
 
 final class MarkdownCleaner
@@ -27,7 +29,7 @@ final class MarkdownCleaner
     private function splitIntoLines(string $markdown): array
     {
         $lines = preg_split(
-            '/(?<=\r\n)|(?<=\n)|(?<=\r)/',
+            '/(?<=\r\n)|(?<=\n)|(?<=\r)(?!\n)/',
             $markdown,
         );
 
@@ -38,7 +40,7 @@ final class MarkdownCleaner
         return array_values(
             array_filter(
                 $lines,
-                static fn (string $line): bool => $line !== '',
+                static fn(string $line): bool => $line !== '',
             ),
         );
     }
@@ -86,7 +88,7 @@ final class MarkdownCleaner
 
             if ($this->isBlankLine($line)) {
                 // Retain only the first blank line in a consecutive sequence.
-                $pendingBlankLine ??= $line;
+                $pendingBlankLine ??= $this->normaliseBlankLine($line);
 
                 continue;
             }
@@ -109,6 +111,7 @@ final class MarkdownCleaner
 
     /**
      * @param list<string> $cleanedLines
+     * @param-out null $pendingBlankLine
      */
     private function appendPendingBlankLine(
         array &$cleanedLines,
@@ -125,6 +128,18 @@ final class MarkdownCleaner
     private function isBlankLine(string $line): bool
     {
         return trim($line) === '';
+    }
+
+    /**
+     * Removes horizontal whitespace while retaining the original line ending.
+     */
+    private function normaliseBlankLine(string $line): string
+    {
+        if (preg_match('/(?:\r\n|\n|\r)$/', $line, $matches) !== 1) {
+            return '';
+        }
+
+        return $matches[0];
     }
 
     /**
@@ -161,12 +176,12 @@ final class MarkdownCleaner
         );
 
         return preg_match(
-                sprintf(
-                    '/^ {0,3}%s{%d,}[ \t]*(?:\r\n|\n|\r)?$/',
-                    $character,
-                    $openFence['length'],
-                ),
-                $line,
-            ) === 1;
+            sprintf(
+                '/^ {0,3}%s{%d,}[ \t]*(?:\r\n|\n|\r)?$/',
+                $character,
+                $openFence['length'],
+            ),
+            $line,
+        ) === 1;
     }
 }
