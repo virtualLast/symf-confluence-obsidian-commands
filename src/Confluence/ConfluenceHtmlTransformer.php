@@ -18,6 +18,8 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
         $document = $this->loadFragment($html);
         $xpath = new DOMXPath($document);
 
+        $this->normaliseNestedLists();
+        $this->wrapStandaloneImages();
         $this->wrapTopLevelAnchors($xpath);
         $this->wrapStandaloneLinks($xpath);
 
@@ -90,5 +92,14 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
             $parent->replaceChild($paragraph, $link);
             $paragraph->appendChild($link);
         }
+    }
+
+    private function normaliseNestedLists(): void
+    {
+    }
+
+    private function wrapStandaloneImages(): void
+    {
+
     }
 }
