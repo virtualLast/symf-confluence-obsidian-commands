@@ -119,4 +119,9 @@ HTML;
         );
     }
 
+    // When a list item contains no meaningful direct text and contains only a nested list,
+    // promote the nested list items into the parent list level.
+
+    // Wrap standalone top-level inline content in block-level paragraphs before Markdown conversion.
+
 }
