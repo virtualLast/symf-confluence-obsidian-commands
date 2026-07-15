@@ -1,0 +1,222 @@
+<?php
+
+namespace App\Tests\Command;
+
+use App\Command\ImportConfluenceCommand;
+use App\Confluence\ConfluenceImporter;
+use App\Model\ImportedPage;
+use App\Obsidian\ObsidianWriter;
+use PHPUnit\Framework\TestCase;
+use RuntimeException;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\String\Slugger\AsciiSlugger;
+
+final class ImportConfluenceCommandTest extends TestCase
+{
+    private string $vaultPath;
+
+    private Filesystem $filesystem;
+
+    protected function setUp(): void
+    {
+        $this->filesystem = new Filesystem();
+
+        $this->vaultPath = sprintf(
+            '%s/import-confluence-command-test-%s',
+            sys_get_temp_dir(),
+            bin2hex(random_bytes(8)),
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        $this->filesystem->remove($this->vaultPath);
+    }
+
+    public function testItImportsAPageIntoTheVault(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 123,
+            title: 'SSO Overview',
+            content: "# SSO Overview\n\nImported content.",
+        );
+
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+        ]);
+
+        $expectedFilePath = $this->vaultPath
+            . DIRECTORY_SEPARATOR
+            . 'sso-overview.md';
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($expectedFilePath);
+
+        self::assertSame(
+            $importedPage->content,
+            file_get_contents($expectedFilePath),
+        );
+
+        self::assertStringContainsString(
+            'Imported "SSO Overview"',
+            $commandTester->getDisplay(),
+        );
+
+        self::assertStringContainsString(
+            $expectedFilePath,
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function testItImportsAPageIntoTheRequestedDestination(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 456,
+            title: 'Authentication Architecture',
+            content: '# Authentication Architecture',
+        );
+
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(456)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => '456',
+            'destination' => 'Areas/Engineering',
+        ]);
+
+        $expectedFilePath = implode(
+            DIRECTORY_SEPARATOR,
+            [
+                $this->vaultPath,
+                'Areas',
+                'Engineering',
+                'authentication-architecture.md',
+            ],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($expectedFilePath);
+
+        self::assertSame(
+            $importedPage->content,
+            file_get_contents($expectedFilePath),
+        );
+    }
+
+    public function testItReturnsFailureWhenThePageCannotBeImported(): void
+    {
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123)
+            ->willThrowException(
+                new RuntimeException('Unable to fetch Confluence page.'),
+            );
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        self::assertStringContainsString(
+            'Unable to fetch Confluence page.',
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function testItReturnsFailureWhenThePageCannotBeWritten(): void
+    {
+        /*
+         * Creating a file at the configured vault path means Symfony cannot
+         * create a Markdown file beneath it as though it were a directory.
+         */
+        $this->filesystem->dumpFile(
+            $this->vaultPath,
+            'This path is a file rather than a directory.',
+        );
+
+        $importedPage = new ImportedPage(
+            id: 123,
+            title: 'SSO Overview',
+            content: 'Page content.',
+        );
+
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+        );
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+
+        self::assertStringContainsString(
+            'Unable to write the imported page',
+            $commandTester->getDisplay(),
+        );
+    }
+
+    private function createCommandTester(
+        ConfluenceImporter $confluenceImporter,
+    ): CommandTester {
+        $obsidianWriter = new ObsidianWriter(
+            vaultPath: $this->vaultPath,
+            slugger: new AsciiSlugger(),
+            filesystem: $this->filesystem,
+        );
+
+        $command = new ImportConfluenceCommand(
+            confluenceImporter: $confluenceImporter,
+            obsidianWriter: $obsidianWriter,
+        );
+
+        return new CommandTester($command);
+    }
+}
