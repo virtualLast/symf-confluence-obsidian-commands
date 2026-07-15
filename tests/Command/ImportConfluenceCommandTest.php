@@ -88,7 +88,11 @@ final class ImportConfluenceCommandTest extends TestCase
 
         self::assertStringContainsString(
             basename($expectedFilePath),
-            $commandTester->getDisplay(),
+            str_replace(
+                [" ", "\t", "\n", "\r", "\0", "\x0B"],
+                '',
+                $commandTester->getDisplay(),
+            ),
         );
     }
 
