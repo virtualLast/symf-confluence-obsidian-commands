@@ -12,6 +12,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
@@ -24,6 +25,7 @@ final class ImportConfluenceCommand extends Command
 {
     private const string PAGE_ARGUMENT = 'page';
     private const string DESTINATION_ARGUMENT = 'destination';
+    private const string WITH_ATTACHMENTS_OPTION = 'with-attachments';
 
     public function __construct(
         private readonly ConfluenceImporter $confluenceImporter,
@@ -45,6 +47,12 @@ final class ImportConfluenceCommand extends Command
                 InputArgument::OPTIONAL,
                 'Destination directory relative to the Obsidian vault',
                 '',
+            )
+            ->addOption(
+                self::WITH_ATTACHMENTS_OPTION,
+                null,
+                InputOption::VALUE_NONE,
+                'Import attachments for the Confluence page',
             );
     }
 
@@ -77,9 +85,15 @@ final class ImportConfluenceCommand extends Command
         $destination = (string) $input->getArgument(
             self::DESTINATION_ARGUMENT,
         );
+        $withAttachments = (bool) $input->getOption(
+            self::WITH_ATTACHMENTS_OPTION,
+        );
 
         try {
-            $importedPage = $this->confluenceImporter->importPage($pageId);
+            $importedPage = $this->confluenceImporter->importPage(
+                $pageId,
+                $withAttachments,
+            );
         } catch (\Exception|HttpClientException $exception) {
             $io->error($exception->getMessage());
 

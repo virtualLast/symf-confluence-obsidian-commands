@@ -58,7 +58,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123)
+            ->with(123, false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -97,6 +97,39 @@ final class ImportConfluenceCommandTest extends TestCase
     }
 
     /**
+     * What: The command requests attachments when the option is supplied.
+     * How: The importer expectation verifies the option is forwarded as true.
+     * Why: Attachment fetching should be opt-in at the command boundary.
+     */
+    public function testItImportsAPageWithAttachments(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 123,
+            title: 'SSO Overview',
+            content: '# SSO Overview',
+        );
+
+        $confluenceImporter = $this->createMock(
+            ConfluenceImporter::class,
+        );
+
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123, true)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester($confluenceImporter);
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+            '--with-attachments' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    /**
      * What: The command honours a nested destination supplied by the user.
      * How: The command is executed with a destination and the resulting file path and content are checked.
      * Why: Users need to place imported pages into the correct area of an Obsidian vault.
@@ -116,7 +149,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(456)
+            ->with(456, false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -161,7 +194,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123)
+            ->with(123, false)
             ->willThrowException(
                 new RuntimeException('Unable to fetch Confluence page.'),
             );
@@ -211,7 +244,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123)
+            ->with(123, false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -249,7 +282,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123)
+            ->with(123, false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(

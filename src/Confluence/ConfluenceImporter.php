@@ -25,19 +25,25 @@ readonly class ConfluenceImporter
     {
         $page = $this->confluenceClient->getPage($pageId);
 
-        $importedPageId = $page->getId();
+        $importedPageId = filter_var(
+            $page->getId(),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
 
-        if ($importedPageId === null) {
+        if ($importedPageId === false) {
             throw new \UnexpectedValueException(
-                'The Confluence response did not contain a page ID.',
+                'The Confluence response did not contain a valid page ID.',
             );
         }
 
         $attachments = [];
 
-        // if ($withAttachments) {
-            $attachments = $this->confluenceClient->getPageAttachments($page);
-        // }
+        if ($withAttachments) {
+            $attachments = $this->confluenceClient
+                ->getPageAttachments($page)
+                ->getResults();
+        }
 
         $markdown = $this->confluenceContentConverter->toMarkdown(
             $page->getContent() ?? '',
@@ -47,7 +53,7 @@ readonly class ConfluenceImporter
             $importedPageId,
             $page->getTitle() ?? '',
             $markdown,
-            $attachments->getResults() ?? []
+            $attachments,
         );
     }
 }
