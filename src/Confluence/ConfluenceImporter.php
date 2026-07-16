@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Confluence;
 
+use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
-use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
+use CloudPlayDev\ConfluenceClient\Entity\ContentAttachment;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
 use Http\Client\Exception;
 
@@ -40,9 +41,23 @@ readonly class ConfluenceImporter
         $attachments = [];
 
         if ($withAttachments) {
-            $attachments = $this->confluenceClient
+            $confluenceAttachments = $this->confluenceClient
                 ->getPageAttachments($page)
                 ->getResults();
+
+            foreach ($confluenceAttachments as $attachment) {
+                if (!$attachment instanceof ContentAttachment) {
+                    throw new \UnexpectedValueException(
+                        'The Confluence response contained an invalid attachment.',
+                    );
+                }
+
+                $attachments[] = new ImportedAttachment(
+                    id: (string) $attachment->getId(),
+                    filename: (string) $attachment->getTitle(),
+                    contents: $this->confluenceClient->downloadAttachment($attachment),
+                );
+            }
         }
 
         $markdown = $this->confluenceContentConverter->toMarkdown(

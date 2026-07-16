@@ -8,11 +8,15 @@ use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceSdkClientFactoryInterface;
 use CloudPlayDev\ConfluenceClient\Api\Content;
 use CloudPlayDev\ConfluenceClient\ConfluenceClient as SdkClient;
+use CloudPlayDev\ConfluenceClient\Entity\ContentAttachment;
 use CloudPlayDev\ConfluenceClient\Entity\ContentBody;
 use CloudPlayDev\ConfluenceClient\Entity\ContentPage;
 use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
 use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
+use Http\Client\Common\HttpMethodsClientInterface;
+use Http\Client\Exception;
 use Http\Client\Exception\TransferException;
+use Nyholm\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 
 final class ConfluenceClientTest extends TestCase
@@ -153,6 +157,74 @@ final class ConfluenceClientTest extends TestCase
         self::assertSame($children, $result);
     }
 
+    /**
+     * What: Confluence attachments are downloaded from the Confluence API.
+     * How: The Confluence API is queried for the attachment contents.
+     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
+     * @throws Exception
+     * @throws ConfluencePhpClientException
+     */
+    public function testItDownloadsRawAttachmentContents(): void
+    {
+        // arrange
+        $contents = "\xFF\xD8\xFFexample-jpeg-data";
+        $attachment = new ContentAttachment()
+            ->setDownloadUrl('/download/attachments/123/photo.jpg');
+        $httpClient = $this->createMock(HttpMethodsClientInterface::class);
+        $httpClient
+            ->expects(self::once())
+            ->method('get')
+            ->with('/download/attachments/123/photo.jpg')
+            ->willReturn(new Response(200, [], $contents));
+
+        // act
+        $result = $this->createClientWithHttpClient($httpClient)
+            ->downloadAttachment($attachment);
+
+        // assert
+        self::assertSame($contents, $result);
+    }
+
+    /**
+     * What: Confluence attachments are downloaded from the Confluence API.
+     * How: The Confluence API is queried for the attachment contents.
+     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
+     * @throws Exception
+     */
+    public function testItReportsAMissingAttachmentDownloadUrl(): void
+    {
+        // assert
+        $this->expectException(ConfluencePhpClientException::class);
+        $this->expectExceptionMessageIsOrContains('does not contain a download URL');
+
+        // act
+        $this->createClient($this->createStub(Content::class))
+            ->downloadAttachment(new ContentAttachment());
+    }
+
+    /**
+     * What: Confluence attachments are downloaded from the Confluence API.
+     * How: The Confluence API is queried for the attachment contents.
+     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
+     * @throws Exception
+     */
+    public function testItReportsAnUnsuccessfulAttachmentDownload(): void
+    {
+        // arrange
+        $attachment = new ContentAttachment()->setDownloadUrl('/missing.jpg');
+        $httpClient = $this->createStub(HttpMethodsClientInterface::class);
+        $httpClient->method('get')->willReturn(new Response(404));
+
+        // assert
+        $this->expectException(ConfluencePhpClientException::class);
+        $this->expectExceptionCode(404);
+        $this->expectExceptionMessageIsOrContains('The endpoint you have tried to access does not exist.');
+
+        // act
+        $this->createClientWithHttpClient($httpClient)
+            ->downloadAttachment($attachment);
+    }
+
     private function createClient(Content $contentApi): ConfluenceClient
     {
         $sdkClient = $this->createStub(SdkClient::class);
@@ -161,6 +233,18 @@ final class ConfluenceClientTest extends TestCase
         $factory = $this->createStub(
             ConfluenceSdkClientFactoryInterface::class,
         );
+        $factory->method('create')->willReturn($sdkClient);
+
+        return new ConfluenceClient($factory);
+    }
+
+    private function createClientWithHttpClient(
+        HttpMethodsClientInterface $httpClient,
+    ): ConfluenceClient {
+        $sdkClient = $this->createStub(SdkClient::class);
+        $sdkClient->method('getHttpClient')->willReturn($httpClient);
+
+        $factory = $this->createStub(ConfluenceSdkClientFactoryInterface::class);
         $factory->method('create')->willReturn($sdkClient);
 
         return new ConfluenceClient($factory);

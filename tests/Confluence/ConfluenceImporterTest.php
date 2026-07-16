@@ -7,8 +7,13 @@ namespace App\Tests\Confluence;
 use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceImporter;
+use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
+use CloudPlayDev\ConfluenceClient\Entity\ContentAttachment;
+use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
+use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
+use Http\Client\Exception;
 use PHPUnit\Framework\TestCase;
 
 class ConfluenceImporterTest extends TestCase
@@ -82,6 +87,68 @@ class ConfluenceImporterTest extends TestCase
             "## Heading\n\nHello **world**",
             trim($result),
         );
+    }
+
+    /**
+     * What: Confluence attachments are converted into local models.
+     * How: The Confluence API is queried for the attachment contents, which are then converted into a local model.
+     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
+     * @return void
+     * @throws ConfluencePhpClientException
+     * @throws Exception
+     * @throws \JsonException
+     * @throws \PHPUnit\Framework\MockObject\Exception
+     */
+    public function testItConvertsAttachmentsToLocalModels(): void
+    {
+        // arrange
+        $contents = "\xFF\xD8\xFFexample-jpeg-data";
+        $page = $this->createStub(AbstractContent::class);
+        $page->method('getId')->willReturn(123);
+        $page->method('getTitle')->willReturn('Page with attachment');
+        $page->method('getContent')->willReturn('Content');
+
+        $attachment = new ContentAttachment();
+        $attachment
+            ->setId('456')
+            ->setTitle('photo.jpg');
+        $attachment->setDownloadUrl('/download/attachments/123/photo.jpg');
+        $attachmentResult = new ContentSearchResult()
+            ->setResults([$attachment]);
+
+        $confluenceClient = $this->createMock(ConfluenceClient::class);
+        $confluenceClient
+            ->expects(self::once())
+            ->method('getPage')
+            ->with(123)
+            ->willReturn($page);
+        $confluenceClient
+            ->expects(self::once())
+            ->method('getPageAttachments')
+            ->with($page)
+            ->willReturn($attachmentResult);
+        $confluenceClient
+            ->expects(self::once())
+            ->method('downloadAttachment')
+            ->with($attachment)
+            ->willReturn($contents);
+
+        // act
+        $importedPage = new ConfluenceImporter(
+            $confluenceClient,
+            $this->createConfluenceContentConverter(),
+        )->importPage(123, true);
+
+        // assert
+        self::assertCount(1, $importedPage->attachments);
+        self::assertSame(
+            [ImportedAttachment::class],
+            array_map(get_debug_type(...), $importedPage->attachments),
+        );
+        self::assertNotContains($attachment, $importedPage->attachments);
+        self::assertSame('456', $importedPage->attachments[0]->id);
+        self::assertSame('photo.jpg', $importedPage->attachments[0]->filename);
+        self::assertSame($contents, $importedPage->attachments[0]->contents);
     }
 
     private function createConfluenceContentConverter(): ConfluenceContentConverter
