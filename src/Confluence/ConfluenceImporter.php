@@ -21,7 +21,7 @@ readonly class ConfluenceImporter
      * @throws ConfluencePhpClientException
      * @throws \JsonException
      */
-    public function importPage(int $pageId): ImportedPage
+    public function importPage(int $pageId, bool $withAttachments = false): ImportedPage
     {
         $page = $this->confluenceClient->getPage($pageId);
 
@@ -33,6 +33,12 @@ readonly class ConfluenceImporter
             );
         }
 
+        $attachments = [];
+
+        // if ($withAttachments) {
+            $attachments = $this->confluenceClient->getPageAttachments($page);
+        // }
+
         $markdown = $this->confluenceContentConverter->toMarkdown(
             $page->getContent() ?? '',
         );
@@ -41,6 +47,7 @@ readonly class ConfluenceImporter
             $importedPageId,
             $page->getTitle() ?? '',
             $markdown,
+            $attachments->getResults() ?? []
         );
     }
 }

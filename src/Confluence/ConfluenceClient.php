@@ -75,4 +75,21 @@ readonly class ConfluenceClient
         }
     }
 
+    /**
+     * @throws Exception
+     * @throws \JsonException
+     * @throws ConfluencePhpClientException
+     */
+    public function getPageAttachments(AbstractContent $page): ContentSearchResult
+    {
+        try {
+            return $this->clientFactory
+                ->create()
+                ->content()
+                ->children($page, Content::CONTENT_TYPE_ATTACHMENT);
+        } catch (Exception $e) {
+            throw new ConfluencePhpClientException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
 }

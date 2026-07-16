@@ -5,13 +5,19 @@
     "license": "proprietary",
     "minimum-stability": "stable",
     "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:virtualLast/confluence-php-client.git"
+        }
+    ],
     "require": {
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-dom": "*",
         "ext-iconv": "*",
         "ext-libxml": "*",
-        "cloudplaydev/confluence-php-client": "^0.6.0",
+        "cloudplaydev/confluence-php-client": "dev-feature/attachment-download-url",
         "league/html-to-markdown": "^5.1",
         "nyholm/psr7": "^1.8",
         "symfony/console": "8.1.*",

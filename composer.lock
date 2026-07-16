@@ -4,25 +4,25 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9e85fb732442de16a99980aa2e5fe3ec",
+    "content-hash": "f13c1945031be5e03faa383586f68d81",
     "packages": [
         {
             "name": "cloudplaydev/confluence-php-client",
-            "version": "0.6.0",
+            "version": "dev-feature/attachment-download-url",
             "source": {
                 "type": "git",
-                "url": "https://github.com/CloudPlayDev/confluence-php-client.git",
-                "reference": "13a630504626c63034c4747b728dacd584d55711"
+                "url": "https://github.com/virtualLast/confluence-php-client.git",
+                "reference": "6c06c7dd482a35c8407eb91956821861512c122d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CloudPlayDev/confluence-php-client/zipball/13a630504626c63034c4747b728dacd584d55711",
-                "reference": "13a630504626c63034c4747b728dacd584d55711",
+                "url": "https://api.github.com/repos/virtualLast/confluence-php-client/zipball/6c06c7dd482a35c8407eb91956821861512c122d",
+                "reference": "6c06c7dd482a35c8407eb91956821861512c122d",
                 "shasum": ""
             },
             "require": {
                 "ext-json": "*",
-                "php": "^7.4 || ^8.1",
+                "php": "^8.1",
                 "php-http/client-common": "^2.2",
                 "php-http/discovery": "^1.11",
                 "php-http/httplug": "^2.0",
@@ -40,7 +40,7 @@
                 "phpstan/extension-installer": "^1.1",
                 "phpstan/phpstan": "^1.0.0",
                 "phpstan/phpstan-webmozart-assert": "^1.0.0",
-                "phpunit/phpunit": "^9.5.5,<=10.0",
+                "phpunit/phpunit": "^10.5",
                 "vimeo/psalm": "^5.1"
             },
             "type": "library",
@@ -51,7 +51,13 @@
                     ]
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "CloudPlayDev\\Tests\\ConfluenceClient\\": [
+                        "tests/"
+                    ]
+                }
+            },
             "license": [
                 "MIT"
             ],
@@ -63,28 +69,27 @@
             ],
             "description": "Provides methods for Confluence REST APIs",
             "keywords": [
+                "API",
+                "Atlassian",
                 "Authentication",
+                "Client",
                 "Confluence",
-                "api",
-                "atlassian",
-                "client",
-                "php"
+                "PHP"
             ],
             "support": {
-                "issues": "https://github.com/CloudPlayDev/confluence-php-client/issues",
-                "source": "https://github.com/CloudPlayDev/confluence-php-client/tree/v0.6.0"
+                "source": "https://github.com/virtualLast/confluence-php-client/tree/feature/attachment-download-url"
             },
             "funding": [
                 {
-                    "url": "https://github.com/CloudPlayDev",
-                    "type": "github"
+                    "type": "github",
+                    "url": "https://github.com/astepin"
                 },
                 {
-                    "url": "https://github.com/astepin",
-                    "type": "github"
+                    "type": "github",
+                    "url": "https://github.com/CloudPlayDev"
                 }
             ],
-            "time": "2024-03-01T22:08:31+00:00"
+            "time": "2026-07-16T08:29:22+00:00"
         },
         {
             "name": "clue/stream-filter",
@@ -7387,7 +7392,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "cloudplaydev/confluence-php-client": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
