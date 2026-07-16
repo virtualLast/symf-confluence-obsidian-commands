@@ -86,6 +86,10 @@ final class MarkdownCleaner
                 continue;
             }
 
+            if ($this->isMacroRenderingError($line)) {
+                continue;
+            }
+
             if ($this->isBlankLine($line)) {
                 // Retain only the first blank line in a consecutive sequence.
                 $pendingBlankLine ??= $this->normaliseBlankLine($line);
@@ -128,6 +132,17 @@ final class MarkdownCleaner
     private function isBlankLine(string $line): bool
     {
         return trim($line) === '';
+    }
+
+    /**
+     * Detects diagnostics emitted when Confluence cannot render a macro.
+     */
+    private function isMacroRenderingError(string $line): bool
+    {
+        return preg_match(
+            '/^\s*Error rendering macro\s+[\'\"][^\'\"]+[\'\"]\s*:\s*.+\s*$/',
+            $line,
+        ) === 1;
     }
 
     /**

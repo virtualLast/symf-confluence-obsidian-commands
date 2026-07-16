@@ -53,6 +53,23 @@ class MarkdownCleanerTest extends TestCase
         );
     }
 
+    /**
+     * What: Confluence macro-rendering diagnostics are removed from imported Markdown.
+     * How: An attachments error in prose and the same text in a code fence are cleaned.
+     * Why: Failed Confluence macros must not leak internal Java errors into notes.
+     */
+    public function testItRemovesMacroRenderingErrorsOutsideCodeFences(): void
+    {
+        $error = 'Error rendering macro \'attachments\' : Cannot invoke "com.atlassian.confluence.core.ContentEntityObject.getId()" because "contentEntityObject" is null';
+        $input = "Before\n\n{$error}\n\n\nAfter\n\n```text\n{$error}\n```\n";
+        $expected = "Before\n\nAfter\n\n```text\n{$error}\n```\n";
+
+        self::assertSame(
+            $expected,
+            $this->cleaner->clean($input),
+        );
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function cleaningFixtureProvider(): iterable
     {
