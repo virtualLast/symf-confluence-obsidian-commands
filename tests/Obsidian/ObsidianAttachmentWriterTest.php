@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Obsidian;
 
 use App\Model\ImportedAttachment;
+use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentWriter;
+use App\Obsidian\ObsidianImageLinkBuilder;
+use App\Obsidian\ObsidianPathBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\String\Slugger\AsciiSlugger;
 
 final class ObsidianAttachmentWriterTest extends TestCase
 {
@@ -35,46 +39,54 @@ final class ObsidianAttachmentWriterTest extends TestCase
     {
         $attachment = new ImportedAttachment(
             id: '123',
-            filename: 'architecture.png',
+            filename: 'icon.jpg',
             content: "\x89PNG\r\n\x1a\n\x00binary-content",
         );
 
-        $filePath = $this->createWriter()->write($attachment);
+        $vaultPath = $this->createWriter()->write($this->createPage(), $attachment);
 
         self::assertSame(
-            realpath($this->vaultPath)
-            . DIRECTORY_SEPARATOR
-            . 'Attachments'
-            . DIRECTORY_SEPARATOR
-            . 'architecture.png',
-            $filePath,
+            'Attachments/Confluence/mike-test-document/icon.jpg',
+            $vaultPath,
         );
-        self::assertFileExists($filePath);
-        self::assertSame($attachment->content, file_get_contents($filePath));
+        self::assertStringNotContainsString($this->vaultPath, $vaultPath);
+        $absolutePath = $this->vaultPath . DIRECTORY_SEPARATOR . str_replace(
+            '/',
+            DIRECTORY_SEPARATOR,
+            $vaultPath,
+        );
+        self::assertFileExists($absolutePath);
+        self::assertSame($attachment->content, file_get_contents($absolutePath));
     }
 
-    public function testItWritesAnAttachmentToANestedAttachmentDestination(): void
+    public function testNoteDestinationDoesNotAffectTheAttachmentPath(): void
     {
         $attachment = new ImportedAttachment('123', 'design.pdf', 'PDF content');
+        $writer = $this->createWriter();
 
-        $filePath = $this->createWriter()->write(
-            $attachment,
-            'Projects/Authentication',
+        $inboxPath = $writer->write($this->createPage(), $attachment);
+        $projectsPath = $writer->write($this->createPage(), $attachment);
+
+        self::assertSame(
+            'Attachments/Confluence/mike-test-document/design.pdf',
+            $inboxPath,
+        );
+        self::assertSame($inboxPath, $projectsPath);
+        self::assertDirectoryExists(
+            $this->vaultPath . '/Attachments/Confluence/mike-test-document',
+        );
+    }
+
+    public function testItBuildsAVaultRelativeObsidianImageEmbed(): void
+    {
+        $link = (new ObsidianImageLinkBuilder())->build(
+            'Attachments/Confluence/mike-test-document/icon.jpg',
         );
 
         self::assertSame(
-            realpath($this->vaultPath)
-            . DIRECTORY_SEPARATOR
-            . 'Attachments'
-            . DIRECTORY_SEPARATOR
-            . 'Projects'
-            . DIRECTORY_SEPARATOR
-            . 'Authentication'
-            . DIRECTORY_SEPARATOR
-            . 'design.pdf',
-            $filePath,
+            '![[Attachments/Confluence/mike-test-document/icon.jpg]]',
+            $link,
         );
-        self::assertFileExists($filePath);
     }
 
     /** @return iterable<string, array{string}> */
@@ -97,21 +109,26 @@ final class ObsidianAttachmentWriterTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('without path segments');
 
-        $this->createWriter()->write($attachment);
+        $this->createWriter()->write($this->createPage(), $attachment);
     }
 
     public function testItOverwritesAnExistingAttachment(): void
     {
         $writer = $this->createWriter();
 
-        $filePath = $writer->write(
+        $vaultPath = $writer->write(
+            $this->createPage(),
             new ImportedAttachment('123', 'document.pdf', 'old content'),
         );
         $writer->write(
+            $this->createPage(),
             new ImportedAttachment('123', 'document.pdf', 'new content'),
         );
 
-        self::assertSame('new content', file_get_contents($filePath));
+        self::assertSame(
+            'new content',
+            file_get_contents($this->vaultPath . '/' . $vaultPath),
+        );
     }
 
     private function createWriter(): ObsidianAttachmentWriter
@@ -119,6 +136,12 @@ final class ObsidianAttachmentWriterTest extends TestCase
         return new ObsidianAttachmentWriter(
             vaultPath: $this->vaultPath,
             filesystem: $this->filesystem,
+            pathBuilder: new ObsidianPathBuilder(new AsciiSlugger()),
         );
+    }
+
+    private function createPage(): ImportedPage
+    {
+        return new ImportedPage(123, 'Mike Test Document', 'Content');
     }
 }

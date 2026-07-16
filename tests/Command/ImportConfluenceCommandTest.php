@@ -10,6 +10,7 @@ use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentWriter;
 use App\Obsidian\ObsidianPageWriter;
+use App\Obsidian\ObsidianPathBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -143,6 +144,10 @@ final class ImportConfluenceCommandTest extends TestCase
                 . DIRECTORY_SEPARATOR
                 . 'Attachments'
                 . DIRECTORY_SEPARATOR
+                . 'Confluence'
+                . DIRECTORY_SEPARATOR
+                . 'sso-overview'
+                . DIRECTORY_SEPARATOR
                 . 'architecture.png',
             ),
         );
@@ -200,9 +205,9 @@ final class ImportConfluenceCommandTest extends TestCase
     }
 
     /**
-     * What: Attachments use the requested destination beneath the vault's attachment directory.
+     * What: Attachments use a page-scoped directory independent of the note destination.
      * How: A page with an attachment is imported to a nested destination and both files are checked.
-     * Why: Page and attachment organisation must remain aligned when a destination is supplied.
+     * Why: Attachment storage is stable when a note is moved or imported elsewhere.
      */
     public function testItImportsAttachmentsIntoTheRequestedDestination(): void
     {
@@ -235,8 +240,8 @@ final class ImportConfluenceCommandTest extends TestCase
             [
                 $this->vaultPath,
                 'Attachments',
-                'Areas',
-                'Engineering',
+                'Confluence',
+                'authentication-architecture',
                 'design.pdf',
             ],
         );
@@ -448,14 +453,16 @@ final class ImportConfluenceCommandTest extends TestCase
     private function createCommandTester(
         ConfluenceImporter $confluenceImporter,
     ): CommandTester {
+        $pathBuilder = new ObsidianPathBuilder(new AsciiSlugger());
         $obsidianWriter = new ObsidianPageWriter(
             vaultPath: $this->vaultPath,
-            slugger: new AsciiSlugger(),
+            pathBuilder: $pathBuilder,
             filesystem: $this->filesystem,
         );
         $obsidianAttachmentWriter = new ObsidianAttachmentWriter(
             vaultPath: $this->vaultPath,
             filesystem: $this->filesystem,
+            pathBuilder: $pathBuilder,
         );
 
         $command = new ImportConfluenceCommand(

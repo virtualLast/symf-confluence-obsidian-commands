@@ -7,7 +7,6 @@ namespace App\Obsidian;
 use App\Model\ImportedPage;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\String\Slugger\SluggerInterface;
 
 final class ObsidianPageWriter extends ObsidianWriter
 {
@@ -15,7 +14,7 @@ final class ObsidianPageWriter extends ObsidianWriter
         #[Autowire(env: 'OBSIDIAN_VAULT')]
         string $vaultPath,
         Filesystem $filesystem,
-        private readonly SluggerInterface $slugger,
+        private readonly ObsidianPathBuilder $pathBuilder,
     ) {
         parent::__construct(
             $filesystem,
@@ -45,24 +44,7 @@ final class ObsidianPageWriter extends ObsidianWriter
 
         return $this->prepareFilePath(
             $destinationPath,
-            $this->makeFilename($imported->title) . '.md',
-        );
-    }
-
-    private function makeFilename(string $title): string
-    {
-        $filename = $this->slugger
-            ->slug($title)
-            ->lower()
-            ->toString();
-
-        if ($filename !== '') {
-            return $filename;
-        }
-
-        return sprintf(
-            'untitled-%s',
-            date('y-m-d-H:i:s'),
+            $this->pathBuilder->pageFilename($imported),
         );
     }
 }

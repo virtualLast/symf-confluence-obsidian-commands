@@ -6,6 +6,7 @@ namespace App\Tests\Obsidian;
 
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianPageWriter;
+use App\Obsidian\ObsidianPathBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -316,7 +317,7 @@ final class ObsidianWriterTest extends TestCase
     {
         $writer = new ObsidianPageWriter(
             vaultPath: 'relative/vault',
-            slugger: new AsciiSlugger(),
+            pathBuilder: $this->createPathBuilder(),
             filesystem: $this->filesystem,
         );
 
@@ -330,8 +331,13 @@ final class ObsidianWriterTest extends TestCase
     {
         return new ObsidianPageWriter(
             vaultPath: $this->vaultPath,
-            slugger: new AsciiSlugger(),
+            pathBuilder: $this->createPathBuilder(),
             filesystem: $this->filesystem,
         );
+    }
+
+    private function createPathBuilder(): ObsidianPathBuilder
+    {
+        return new ObsidianPathBuilder(new AsciiSlugger());
     }
 }

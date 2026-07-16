@@ -119,8 +119,8 @@ final class ImportConfluenceCommand extends Command
         try {
             foreach ($importedPage->attachments as $attachment) {
                 $this->obsidianAttachmentWriter->write(
+                    $importedPage,
                     $attachment,
-                    $destination,
                 );
             }
         } catch (IOExceptionInterface | InvalidArgumentException $exception) {

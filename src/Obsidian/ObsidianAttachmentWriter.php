@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Obsidian;
 
 use App\Model\ImportedAttachment;
+use App\Model\ImportedPage;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -14,6 +15,7 @@ final class ObsidianAttachmentWriter extends ObsidianWriter
         #[Autowire(env: 'OBSIDIAN_VAULT')]
         string $vaultPath,
         Filesystem $filesystem,
+        private readonly ObsidianPathBuilder $pathBuilder,
     ) {
         parent::__construct(
             $filesystem,
@@ -22,32 +24,22 @@ final class ObsidianAttachmentWriter extends ObsidianWriter
     }
 
     public function write(
-        ImportedAttachment $imported,
-        string $destination = '',
+        ImportedPage $page,
+        ImportedAttachment $attachment,
     ): string {
-        return $this->writeFile(
-            $this->buildFilePath($imported, $destination),
-            $imported->content,
-        );
-    }
-
-    private function buildFilePath(
-        ImportedAttachment $imported,
-        string $destination = '',
-    ): string {
-        $vaultPath = $this->prepareVaultPath();
-        $attachmentPath = $this->prepareDestinationPath(
-            $vaultPath,
-            'Attachments',
-        );
-        $destinationPath = $this->prepareDestinationPath(
-            $attachmentPath,
-            $destination,
+        $vaultPath = $this->pathBuilder->attachmentVaultPath($page, $attachment);
+        $segments = explode('/', $vaultPath);
+        $filename = array_pop($segments);
+        $absoluteDirectory = $this->prepareDestinationPath(
+            $this->prepareVaultPath(),
+            implode('/', $segments),
         );
 
-        return $this->prepareFilePath(
-            $destinationPath,
-            $imported->filename,
+        $this->writeFile(
+            $this->prepareFilePath($absoluteDirectory, $filename),
+            $attachment->content,
         );
+
+        return $vaultPath;
     }
 }
