@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
+use App\Obsidian\ObsidianAttachmentWriter;
 use App\Obsidian\ObsidianPageWriter;
 use Http\Client\Exception as HttpClientException;
 use InvalidArgumentException;
@@ -30,6 +31,7 @@ final class ImportConfluenceCommand extends Command
     public function __construct(
         private readonly ConfluenceImporter $confluenceImporter,
         private readonly ObsidianPageWriter $obsidianWriter,
+        private readonly ObsidianAttachmentWriter $obsidianAttachmentWriter,
     ) {
         parent::__construct();
     }
@@ -108,6 +110,22 @@ final class ImportConfluenceCommand extends Command
         } catch (IOExceptionInterface | InvalidArgumentException $exception) {
             $io->error(sprintf(
                 'Unable to write the imported page: %s',
+                $exception->getMessage(),
+            ));
+
+            return Command::FAILURE;
+        }
+
+        try {
+            foreach ($importedPage->attachments as $attachment) {
+                $this->obsidianAttachmentWriter->write(
+                    $attachment,
+                    $destination,
+                );
+            }
+        } catch (IOExceptionInterface | InvalidArgumentException $exception) {
+            $io->error(sprintf(
+                'Unable to write an imported attachment: %s',
                 $exception->getMessage(),
             ));
 

@@ -6,7 +6,9 @@ namespace App\Tests\Command;
 
 use App\Command\ImportConfluenceCommand;
 use App\Confluence\ConfluenceImporter;
+use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
+use App\Obsidian\ObsidianAttachmentWriter;
 use App\Obsidian\ObsidianPageWriter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -107,6 +109,13 @@ final class ImportConfluenceCommandTest extends TestCase
             id: 123,
             title: 'SSO Overview',
             content: '# SSO Overview',
+            attachments: [
+                new ImportedAttachment(
+                    id: '456',
+                    filename: 'architecture.png',
+                    content: "\x89PNG\r\n\x1a\n\x00binary-content",
+                ),
+            ],
         );
 
         $confluenceImporter = $this->createMock(
@@ -127,6 +136,16 @@ final class ImportConfluenceCommandTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertSame(
+            $importedPage->attachments[0]->content,
+            file_get_contents(
+                $this->vaultPath
+                . DIRECTORY_SEPARATOR
+                . 'Attachments'
+                . DIRECTORY_SEPARATOR
+                . 'architecture.png',
+            ),
+        );
     }
 
     /**
@@ -177,6 +196,90 @@ final class ImportConfluenceCommandTest extends TestCase
         self::assertSame(
             $importedPage->content,
             file_get_contents($expectedFilePath),
+        );
+    }
+
+    /**
+     * What: Attachments use the requested destination beneath the vault's attachment directory.
+     * How: A page with an attachment is imported to a nested destination and both files are checked.
+     * Why: Page and attachment organisation must remain aligned when a destination is supplied.
+     */
+    public function testItImportsAttachmentsIntoTheRequestedDestination(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 456,
+            title: 'Authentication Architecture',
+            content: '# Authentication Architecture',
+            attachments: [
+                new ImportedAttachment('789', 'design.pdf', 'PDF content'),
+            ],
+        );
+
+        $confluenceImporter = $this->createMock(ConfluenceImporter::class);
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(456, true)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester($confluenceImporter);
+
+        $exitCode = $commandTester->execute([
+            'page' => '456',
+            'destination' => 'Areas/Engineering',
+            '--with-attachments' => true,
+        ]);
+
+        $attachmentPath = implode(
+            DIRECTORY_SEPARATOR,
+            [
+                $this->vaultPath,
+                'Attachments',
+                'Areas',
+                'Engineering',
+                'design.pdf',
+            ],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($attachmentPath);
+        self::assertSame('PDF content', file_get_contents($attachmentPath));
+    }
+
+    /**
+     * What: Attachment write failures make the command fail with an actionable error.
+     * How: The importer returns an unsafe attachment filename and the command output is inspected.
+     * Why: A successful page write must not hide a failed or rejected attachment write.
+     */
+    public function testItReturnsFailureWhenAnAttachmentCannotBeWritten(): void
+    {
+        $importedPage = new ImportedPage(
+            id: 123,
+            title: 'SSO Overview',
+            content: 'Page content.',
+            attachments: [
+                new ImportedAttachment('456', '../unsafe.txt', 'content'),
+            ],
+        );
+
+        $confluenceImporter = $this->createMock(ConfluenceImporter::class);
+        $confluenceImporter
+            ->expects(self::once())
+            ->method('importPage')
+            ->with(123, true)
+            ->willReturn($importedPage);
+
+        $commandTester = $this->createCommandTester($confluenceImporter);
+
+        $exitCode = $commandTester->execute([
+            'page' => '123',
+            '--with-attachments' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString(
+            'Unable to write an imported attachment',
+            $commandTester->getDisplay(),
         );
     }
 
@@ -350,10 +453,15 @@ final class ImportConfluenceCommandTest extends TestCase
             slugger: new AsciiSlugger(),
             filesystem: $this->filesystem,
         );
+        $obsidianAttachmentWriter = new ObsidianAttachmentWriter(
+            vaultPath: $this->vaultPath,
+            filesystem: $this->filesystem,
+        );
 
         $command = new ImportConfluenceCommand(
             confluenceImporter: $confluenceImporter,
             obsidianWriter: $obsidianWriter,
+            obsidianAttachmentWriter: $obsidianAttachmentWriter,
         );
 
         return new CommandTester($command);
