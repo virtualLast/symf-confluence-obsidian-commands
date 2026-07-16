@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Obsidian;
 
 use App\Model\ImportedPage;
-use App\Obsidian\ObsidianWriter;
+use App\Obsidian\ObsidianPageWriter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -314,7 +314,7 @@ final class ObsidianWriterTest extends TestCase
      */
     public function testItRejectsARelativeVaultPath(): void
     {
-        $writer = new ObsidianWriter(
+        $writer = new ObsidianPageWriter(
             vaultPath: 'relative/vault',
             slugger: new AsciiSlugger(),
             filesystem: $this->filesystem,
@@ -326,9 +326,9 @@ final class ObsidianWriterTest extends TestCase
         $writer->write(new ImportedPage(123, 'Page', 'Content'));
     }
 
-    private function createWriter(): ObsidianWriter
+    private function createWriter(): ObsidianPageWriter
     {
-        return new ObsidianWriter(
+        return new ObsidianPageWriter(
             vaultPath: $this->vaultPath,
             slugger: new AsciiSlugger(),
             filesystem: $this->filesystem,

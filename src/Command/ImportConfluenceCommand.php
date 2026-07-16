@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
-use App\Obsidian\ObsidianWriter;
+use App\Obsidian\ObsidianPageWriter;
 use Http\Client\Exception as HttpClientException;
 use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,7 +29,7 @@ final class ImportConfluenceCommand extends Command
 
     public function __construct(
         private readonly ConfluenceImporter $confluenceImporter,
-        private readonly ObsidianWriter $obsidianWriter,
+        private readonly ObsidianPageWriter $obsidianWriter,
     ) {
         parent::__construct();
     }

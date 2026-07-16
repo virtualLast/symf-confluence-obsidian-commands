@@ -9,7 +9,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
-final readonly class ObsidianWriter
+final readonly class ObsidianPageWriter
 {
     public function __construct(
         #[Autowire(env: 'OBSIDIAN_VAULT')]

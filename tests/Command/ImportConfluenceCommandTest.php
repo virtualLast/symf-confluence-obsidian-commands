@@ -7,7 +7,7 @@ namespace App\Tests\Command;
 use App\Command\ImportConfluenceCommand;
 use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedPage;
-use App\Obsidian\ObsidianWriter;
+use App\Obsidian\ObsidianPageWriter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -345,7 +345,7 @@ final class ImportConfluenceCommandTest extends TestCase
     private function createCommandTester(
         ConfluenceImporter $confluenceImporter,
     ): CommandTester {
-        $obsidianWriter = new ObsidianWriter(
+        $obsidianWriter = new ObsidianPageWriter(
             vaultPath: $this->vaultPath,
             slugger: new AsciiSlugger(),
             filesystem: $this->filesystem,
