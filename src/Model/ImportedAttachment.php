@@ -9,6 +9,6 @@ final readonly class ImportedAttachment
     public function __construct(
         public string $id,
         public string $filename,
-        public string $contents,
+        public string $content,
     ) {}
 }

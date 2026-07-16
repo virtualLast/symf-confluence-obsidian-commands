@@ -55,7 +55,7 @@ readonly class ConfluenceImporter
                 $attachments[] = new ImportedAttachment(
                     id: (string) $attachment->getId(),
                     filename: (string) $attachment->getTitle(),
-                    contents: $this->confluenceClient->downloadAttachment($attachment),
+                    content: $this->confluenceClient->downloadAttachment($attachment),
                 );
             }
         }

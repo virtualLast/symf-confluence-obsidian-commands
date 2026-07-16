@@ -148,7 +148,7 @@ class ConfluenceImporterTest extends TestCase
         self::assertNotContains($attachment, $importedPage->attachments);
         self::assertSame('456', $importedPage->attachments[0]->id);
         self::assertSame('photo.jpg', $importedPage->attachments[0]->filename);
-        self::assertSame($contents, $importedPage->attachments[0]->contents);
+        self::assertSame($contents, $importedPage->attachments[0]->content);
     }
 
     private function createConfluenceContentConverter(): ConfluenceContentConverter
