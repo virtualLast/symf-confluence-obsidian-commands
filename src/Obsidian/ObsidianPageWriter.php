@@ -9,34 +9,32 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
-final readonly class ObsidianPageWriter
+final class ObsidianPageWriter extends ObsidianWriter
 {
     public function __construct(
         #[Autowire(env: 'OBSIDIAN_VAULT')]
-        private string $vaultPath,
-        private SluggerInterface $slugger,
-        private Filesystem $filesystem,
-    ) {}
+        string $vaultPath,
+        Filesystem $filesystem,
+        private readonly SluggerInterface $slugger,
+    ) {
+        parent::__construct(
+            $filesystem,
+            $vaultPath,
+        );
+    }
 
     public function write(
-        ImportedPage $page,
+        ImportedPage $imported,
         string $destination = '',
     ): string {
-        $filePath = $this->buildFilePath(
-            $page,
-            $destination,
+        return $this->writeFile(
+            $this->buildFilePath($imported, $destination),
+            $imported->content,
         );
-
-        $this->filesystem->dumpFile(
-            $filePath,
-            $page->content,
-        );
-
-        return $filePath;
     }
 
     private function buildFilePath(
-        ImportedPage $page,
+        ImportedPage $imported,
         string $destination = '',
     ): string {
         $vaultPath = $this->prepareVaultPath();
@@ -45,96 +43,10 @@ final readonly class ObsidianPageWriter
             $destination,
         );
 
-        return sprintf(
-            '%s%s%s.md',
+        return $this->prepareFilePath(
             $destinationPath,
-            DIRECTORY_SEPARATOR,
-            $this->makeFilename($page->title),
+            $this->makeFilename($imported->title) . '.md',
         );
-    }
-
-    private function prepareVaultPath(): string
-    {
-        if ($this->vaultPath === '' || !$this->filesystem->isAbsolutePath($this->vaultPath)) {
-            throw new \InvalidArgumentException(
-                'OBSIDIAN_VAULT must be a non-empty absolute path.',
-            );
-        }
-
-        $this->filesystem->mkdir($this->vaultPath);
-
-        $vaultPath = realpath($this->vaultPath);
-
-        if ($vaultPath === false || !is_dir($vaultPath)) {
-            throw new \InvalidArgumentException(
-                'OBSIDIAN_VAULT must resolve to a directory.',
-            );
-        }
-
-        return $vaultPath;
-    }
-
-    private function prepareDestinationPath(
-        string $vaultPath,
-        string $destination,
-    ): string {
-        if ($destination === '') {
-            return $vaultPath;
-        }
-
-        $normalisedDestination = str_replace('\\', '/', $destination);
-
-        if (
-            str_starts_with($normalisedDestination, '/')
-            || preg_match('/^[a-zA-Z]:\//', $normalisedDestination) === 1
-        ) {
-            throw new \InvalidArgumentException(
-                'The destination must be relative to OBSIDIAN_VAULT.',
-            );
-        }
-
-        $segments = explode('/', rtrim($normalisedDestination, '/'));
-        $destinationPath = $vaultPath;
-
-        foreach ($segments as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..') {
-                throw new \InvalidArgumentException(
-                    'The destination contains an unsafe path segment.',
-                );
-            }
-
-            $destinationPath .= DIRECTORY_SEPARATOR . $segment;
-
-            if (is_link($destinationPath)) {
-                throw new \InvalidArgumentException(
-                    'The destination must not contain symbolic links.',
-                );
-            }
-        }
-
-        $this->filesystem->mkdir($destinationPath);
-
-        $resolvedDestination = realpath($destinationPath);
-
-        if (
-            $resolvedDestination === false
-            || !$this->isWithinVault($resolvedDestination, $vaultPath)
-        ) {
-            throw new \InvalidArgumentException(
-                'The destination must remain within OBSIDIAN_VAULT.',
-            );
-        }
-
-        return $resolvedDestination;
-    }
-
-    private function isWithinVault(string $path, string $vaultPath): bool
-    {
-        return $path === $vaultPath
-            || str_starts_with(
-                $path,
-                $vaultPath . DIRECTORY_SEPARATOR,
-            );
     }
 
     private function makeFilename(string $title): string
