@@ -98,4 +98,22 @@ final class ConfluenceImagePlaceholderTransformerTest extends TestCase
             ),
         );
     }
+
+    public function testItMarksAnUnidentifiableUnknownAttachmentWithoutGuessing(): void
+    {
+        $html = '<p class="media-group"><span class="confluence-embedded-file-wrapper">'
+            . '<img class="confluence-embedded-file unknown-attachment" '
+            . 'src="/wiki/plugins/servlet/confluence/placeholder/unknown-attachment?locale=en_US">'
+            . '</span></p>';
+
+        self::assertSame(
+            '<p class="media-group"><span class="confluence-embedded-file-wrapper">'
+            . ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER
+            . '</span></p>',
+            $this->transformer->transform(
+                $html,
+                [new ImportedAttachment('42', 'unknown.docx', 'document')],
+            ),
+        );
+    }
 }

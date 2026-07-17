@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceContentConverter;
+use App\Confluence\ConfluenceImagePlaceholderTransformer;
 use App\Model\ImportedAttachment;
 use App\Tests\Traits\FixtureTrait;
 use PHPUnit\Framework\Attributes\Test;
@@ -46,6 +47,18 @@ final class ConfluenceContentConverterTest extends TestCase
             "Before\n\n@@OBSIDIAN_ATTACHMENT_LIST@@\n\nAfter",
             trim($this->converter->toMarkdown(
                 '<p>Before</p><div class="error">Error rendering macro \'attachments\' : failure</div><p>After</p>',
+            )),
+        );
+    }
+
+    #[Test]
+    public function itPreservesAnUnresolvedAttachmentSentinelWithoutAttachments(): void
+    {
+        self::assertSame(
+            ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER,
+            trim($this->converter->toMarkdown(
+                '<p><img class="confluence-embedded-file unknown-attachment" '
+                . 'src="/wiki/plugins/servlet/confluence/placeholder/unknown-attachment?locale=en_US"></p>',
             )),
         );
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Obsidian;
 
+use App\Confluence\ConfluenceImagePlaceholderTransformer;
 use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
@@ -14,7 +15,7 @@ use Symfony\Component\String\Slugger\AsciiSlugger;
 
 final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
 {
-    public function testItRewritesMultiplePlaceholdersInPositionWithoutAppendingAttachments(): void
+    public function testItRewritesMultiplePlaceholdersAndAppendsUnreferencedAttachments(): void
     {
         $page = new ImportedPage(
             1,
@@ -36,13 +37,14 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
         self::assertSame(
             "Before\n\n![[Attachments/Confluence/mike-test-document/wallpaperflare.com_wallpaper.jpg]]"
             . "\n\nMiddle\n\n![[Attachments/Confluence/mike-test-document/second image.png]]"
-            . "\n\nAfter @@OBSIDIAN_ATTACHMENT-ish:att2@@",
+            . "\n\nAfter @@OBSIDIAN_ATTACHMENT-ish:att2@@"
+            . "\n\n## Attached documents\n\n"
+            . "- [[Attachments/Confluence/mike-test-document/unreferenced.png|unreferenced.png]]",
             $rewriter->rewrite($page)->content,
         );
-        self::assertStringNotContainsString('unreferenced.png', $rewriter->rewrite($page)->content);
     }
 
-    public function testItListsOnlyUnreferencedImagesAtTheAttachmentMacroPosition(): void
+    public function testItListsAllUnreferencedAttachmentsAtTheEnd(): void
     {
         $page = new ImportedPage(
             1,
@@ -61,8 +63,48 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
 
         self::assertSame(
             "Inline:\n\n![[Attachments/Confluence/mike-test-document/inline.jpg]]"
-            . "\n\nAttachments:\n\n![[Attachments/Confluence/mike-test-document/other.png]]\n\nAfter",
+            . "\n\nAttachments:\n\nAfter"
+            . "\n\n## Attached documents\n\n"
+            . "- [[Attachments/Confluence/mike-test-document/other.png|other.png]]\n"
+            . "- [[Attachments/Confluence/mike-test-document/notes.pdf|notes.pdf]]",
             $rewriter->rewrite($page)->content,
+        );
+    }
+
+    public function testItLinksAnInlineDocumentWithoutAddingItToTheFooter(): void
+    {
+        $page = new ImportedPage(
+            1,
+            'Mike Test Document',
+            '@@OBSIDIAN_ATTACHMENT:att1@@',
+            [new ImportedAttachment('1', 'notes.docx', '')],
+        );
+
+        self::assertSame(
+            '[[Attachments/Confluence/mike-test-document/notes.docx|notes.docx]]',
+            $this->createRewriter()->rewrite($page)->content,
+        );
+    }
+
+    public function testItReplacesEveryUnresolvedAttachmentWithAWarning(): void
+    {
+        $placeholder = ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER;
+        $page = new ImportedPage(1, 'Example', $placeholder . "\n\n" . $placeholder, []);
+
+        self::assertSame(
+            "> [!warning] Inline attachment unavailable\n"
+            . "> The original inline attachment could not be identified. Check **Attached documents** below.\n\n"
+            . "> [!warning] Inline attachment unavailable\n"
+            . '> The original inline attachment could not be identified. Check **Attached documents** below.',
+            $this->createRewriter()->rewrite($page)->content,
+        );
+    }
+
+    private function createRewriter(): ObsidianAttachmentPlaceholderRewriter
+    {
+        return new ObsidianAttachmentPlaceholderRewriter(
+            new ObsidianPathBuilder(new AsciiSlugger()),
+            new ObsidianImageLinkBuilder(),
         );
     }
 }

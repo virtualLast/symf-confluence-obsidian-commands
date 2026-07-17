@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Obsidian;
 
 use App\Confluence\ConfluenceAttachmentListPlaceholderTransformer;
+use App\Confluence\ConfluenceImagePlaceholderTransformer;
 use App\Model\ImportedPage;
 
 final readonly class ObsidianAttachmentPlaceholderRewriter
 {
+    private const string UNRESOLVED_ATTACHMENT_WARNING = '> [!warning] Inline attachment unavailable'
+        . "\n> The original inline attachment could not be identified. Check **Attached documents** below.";
+
     public function __construct(
         private ObsidianPathBuilder $pathBuilder,
         private ObsidianImageLinkBuilderInterface $imageLinkBuilder,
@@ -23,36 +27,55 @@ final readonly class ObsidianAttachmentPlaceholderRewriter
             $referencedAttachmentIds = array_fill_keys($matches[1], true);
         }
 
-        $unreferencedImageLinks = [];
+        $unreferencedAttachmentLinks = [];
 
         foreach ($page->attachments as $attachment) {
             $id = str_starts_with($attachment->id, 'att')
                 ? substr($attachment->id, 3)
                 : $attachment->id;
-            $replacements[sprintf('@@OBSIDIAN_ATTACHMENT:att%s@@', $id)] =
-                $this->imageLinkBuilder->build(
-                    $this->pathBuilder->attachmentVaultPath($page, $attachment),
-                );
+            $vaultPath = $this->pathBuilder->attachmentVaultPath($page, $attachment);
+            $placeholder = sprintf('@@OBSIDIAN_ATTACHMENT:att%s@@', $id);
+            $replacements[$placeholder] = $this->isImage($attachment->filename)
+                ? $this->imageLinkBuilder->build($vaultPath)
+                : $this->buildAttachmentLink($vaultPath, $attachment->filename);
 
-            if (!isset($referencedAttachmentIds[$id]) && $this->isImage($attachment->filename)) {
-                $unreferencedImageLinks[] = $replacements[sprintf(
-                    '@@OBSIDIAN_ATTACHMENT:att%s@@',
-                    $id,
-                )];
+            if (!isset($referencedAttachmentIds[$id])) {
+                $unreferencedAttachmentLinks[] = sprintf(
+                    '- %s',
+                    $this->buildAttachmentLink($vaultPath, $attachment->filename),
+                );
             }
         }
 
-        $replacements[ConfluenceAttachmentListPlaceholderTransformer::PLACEHOLDER] = implode(
-            "\n",
-            $unreferencedImageLinks,
+        $replacements[ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER] =
+            self::UNRESOLVED_ATTACHMENT_WARNING;
+
+        $contentWithoutAttachmentMacros = str_replace(
+            [
+                "\n\n" . ConfluenceAttachmentListPlaceholderTransformer::PLACEHOLDER . "\n\n",
+                ConfluenceAttachmentListPlaceholderTransformer::PLACEHOLDER,
+            ],
+            ["\n\n", ''],
+            $page->content,
         );
+        $content = trim(strtr($contentWithoutAttachmentMacros, $replacements));
+
+        if ($unreferencedAttachmentLinks !== []) {
+            $content .= "\n\n## Attached documents\n\n"
+                . implode("\n", $unreferencedAttachmentLinks);
+        }
 
         return new ImportedPage(
             id: $page->id,
             title: $page->title,
-            content: strtr($page->content, $replacements),
+            content: $content,
             attachments: $page->attachments,
         );
+    }
+
+    private function buildAttachmentLink(string $vaultPath, string $filename): string
+    {
+        return sprintf('[[%s|%s]]', $vaultPath, $filename);
     }
 
     private function isImage(string $filename): bool

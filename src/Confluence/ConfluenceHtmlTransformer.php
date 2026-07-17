@@ -17,7 +17,7 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
         'cpp' => 'cpp',
         'css' => 'css',
         'html' => 'html',
-        'java' => 'java',
+        'java' => 'markdown',
         'js' => 'javascript',
         'json' => 'json',
         'php' => 'php',

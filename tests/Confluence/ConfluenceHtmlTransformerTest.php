@@ -73,7 +73,9 @@ HTML;
     #[Test]
     public function itMapsCommonConfluenceBrushAliases(): void
     {
-        foreach (['ts' => 'typescript', 'sh' => 'bash', 'yml' => 'yaml'] as $brush => $language) {
+        foreach (
+            ['java' => 'markdown', 'ts' => 'typescript', 'sh' => 'bash', 'yml' => 'yaml'] as $brush => $language
+        ) {
             $html = sprintf(
                 '<pre data-syntaxhighlighter-params="gutter: false; brush: %s;">code</pre>',
                 $brush,

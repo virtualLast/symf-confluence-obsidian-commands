@@ -10,13 +10,11 @@ use DOMXPath;
 
 final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomDocument
 {
+    public const string UNRESOLVED_ATTACHMENT_PLACEHOLDER = '@@OBSIDIAN-UNRESOLVED-ATTACHMENT@@';
+
     /** @param list<ImportedAttachment> $attachments */
     public function transform(string $html, array $attachments): string
     {
-        if ($attachments === []) {
-            return $html;
-        }
-
         $document = $this->loadFragment($html);
         $xpath = new DOMXPath($document);
         $images = $xpath->query('//img');
@@ -33,6 +31,13 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
             $attachment = $this->matchingAttachment($image, $attachments);
 
             if ($attachment === null) {
+                if ($this->isUnknownAttachment($image)) {
+                    $image->parentNode?->replaceChild(
+                        $document->createTextNode(self::UNRESOLVED_ATTACHMENT_PLACEHOLDER),
+                        $image,
+                    );
+                }
+
                 continue;
             }
 
@@ -54,7 +59,14 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
         return $image->hasAttribute('data-linked-resource-id')
             || $image->hasAttribute('data-linked-resource-default-alias')
             || str_contains($image->getAttribute('class'), 'confluence-embedded-image')
-            || str_contains($image->getAttribute('src'), '/download/attachments/');
+            || str_contains($image->getAttribute('src'), '/download/attachments/')
+            || $this->isUnknownAttachment($image);
+    }
+
+    private function isUnknownAttachment(DOMElement $image): bool
+    {
+        return str_contains($image->getAttribute('class'), 'unknown-attachment')
+            || str_contains($image->getAttribute('src'), '/placeholder/unknown-attachment');
     }
 
     /** @param list<ImportedAttachment> $attachments */
