@@ -9,6 +9,8 @@ use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentWriter;
+use App\Obsidian\ObsidianImageLinkBuilder;
+use App\Obsidian\ObsidianImageLinkBuilderInterface;
 use App\Obsidian\ObsidianPageWriter;
 use App\Obsidian\ObsidianPathBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -64,8 +66,16 @@ final class ImportConfluenceCommandTest extends TestCase
             ->with(123, false)
             ->willReturn($importedPage);
 
+        $imageLinkBuilder = $this->createMock(
+            ObsidianImageLinkBuilderInterface::class,
+        );
+        $imageLinkBuilder
+            ->expects(self::never())
+            ->method('build');
+
         $commandTester = $this->createCommandTester(
             $confluenceImporter,
+            $imageLinkBuilder,
         );
 
         $exitCode = $commandTester->execute([
@@ -129,7 +139,19 @@ final class ImportConfluenceCommandTest extends TestCase
             ->with(123, true)
             ->willReturn($importedPage);
 
-        $commandTester = $this->createCommandTester($confluenceImporter);
+        $imageLinkBuilder = $this->createMock(
+            ObsidianImageLinkBuilderInterface::class,
+        );
+        $imageLinkBuilder
+            ->expects(self::once())
+            ->method('build')
+            ->with('Attachments/Confluence/sso-overview/architecture.png')
+            ->willReturn('![[Attachments/Confluence/sso-overview/architecture.png]]');
+
+        $commandTester = $this->createCommandTester(
+            $confluenceImporter,
+            $imageLinkBuilder,
+        );
 
         $exitCode = $commandTester->execute([
             'page' => '123',
@@ -149,6 +171,14 @@ final class ImportConfluenceCommandTest extends TestCase
                 . 'sso-overview'
                 . DIRECTORY_SEPARATOR
                 . 'architecture.png',
+            ),
+        );
+        self::assertSame(
+            "# SSO Overview\n\n![[Attachments/Confluence/sso-overview/architecture.png]]",
+            file_get_contents(
+                $this->vaultPath
+                . DIRECTORY_SEPARATOR
+                . 'sso-overview.md',
             ),
         );
     }
@@ -372,9 +402,9 @@ final class ImportConfluenceCommandTest extends TestCase
     }
 
     /**
-     * What: The command rejects a destination that would escape the configured vault.
-     * How: A successful import is directed through `..` and the command result is inspected.
-     * Why: The command boundary must report unsafe output paths without writing Markdown elsewhere.
+     * What: The command rejects an unsafe destination before writing attachments.
+     * How: An import with an attachment is directed through `..`, then the vault is inspected.
+     * Why: Destination validation must happen before the command produces any imported files.
      */
     public function testItRejectsADestinationOutsideTheVault(): void
     {
@@ -382,6 +412,9 @@ final class ImportConfluenceCommandTest extends TestCase
             id: 123,
             title: 'SSO Overview',
             content: 'Page content.',
+            attachments: [
+                new ImportedAttachment('456', 'architecture.png', 'image'),
+            ],
         );
 
         $confluenceImporter = $this->createMock(
@@ -390,7 +423,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, false)
+            ->with(123, true)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -400,12 +433,16 @@ final class ImportConfluenceCommandTest extends TestCase
         $exitCode = $commandTester->execute([
             'page' => '123',
             'destination' => '../outside',
+            '--with-attachments' => true,
         ]);
 
         self::assertSame(Command::FAILURE, $exitCode);
         self::assertStringContainsString(
             'path segment.',
             $commandTester->getDisplay(),
+        );
+        self::assertDirectoryDoesNotExist(
+            $this->vaultPath . DIRECTORY_SEPARATOR . 'Attachments',
         );
     }
 
@@ -452,6 +489,7 @@ final class ImportConfluenceCommandTest extends TestCase
 
     private function createCommandTester(
         ConfluenceImporter $confluenceImporter,
+        ?ObsidianImageLinkBuilderInterface $obsidianImageLinkBuilder = null,
     ): CommandTester {
         $pathBuilder = new ObsidianPathBuilder(new AsciiSlugger());
         $obsidianWriter = new ObsidianPageWriter(
@@ -469,6 +507,7 @@ final class ImportConfluenceCommandTest extends TestCase
             confluenceImporter: $confluenceImporter,
             obsidianWriter: $obsidianWriter,
             obsidianAttachmentWriter: $obsidianAttachmentWriter,
+            obsidianImageLinkBuilder: $obsidianImageLinkBuilder ?? new ObsidianImageLinkBuilder(),
         );
 
         return new CommandTester($command);

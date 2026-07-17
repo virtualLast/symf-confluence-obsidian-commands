@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Obsidian;
 
-final readonly class ObsidianImageLinkBuilder
+final readonly class ObsidianImageLinkBuilder implements ObsidianImageLinkBuilderInterface
 {
     public function build(string $vaultPath): string
     {

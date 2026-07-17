@@ -32,6 +32,14 @@ final class ObsidianPageWriter extends ObsidianWriter
         );
     }
 
+    public function validateDestination(string $destination): void
+    {
+        $this->prepareDestinationPath(
+            $this->prepareVaultPath(),
+            $destination,
+        );
+    }
+
     private function buildFilePath(
         ImportedPage $imported,
         string $destination = '',

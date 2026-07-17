@@ -22,6 +22,9 @@ services:
     App\Confluence\ConfluenceSdkClientFactoryInterface:
         alias: App\Confluence\ConfluenceSdkClientFactory
 
+    App\Obsidian\ObsidianImageLinkBuilderInterface:
+        alias: App\Obsidian\ObsidianImageLinkBuilder
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
