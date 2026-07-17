@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Confluence;
 
+use App\Confluence\ConfluenceAttachmentListPlaceholderTransformer;
 use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceHtmlCleaner;
 use App\Confluence\ConfluenceHtmlTransformer;
+use App\Confluence\ConfluenceImagePlaceholderTransformer;
 use App\Markdown\MarkdownCleaner;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
@@ -29,6 +31,8 @@ final class ConfluenceContentConverterFactory
         return new ConfluenceContentConverter(
             new ConfluenceHtmlCleaner(),
             new ConfluenceHtmlTransformer(),
+            new ConfluenceImagePlaceholderTransformer(),
+            new ConfluenceAttachmentListPlaceholderTransformer(),
             $htmlConverter,
             new MarkdownCleaner(),
         );

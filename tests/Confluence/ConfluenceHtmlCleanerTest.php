@@ -53,12 +53,12 @@ final class ConfluenceHtmlCleanerTest extends TestCase
     }
 
     /**
-     * What: Unknown-attachment image wrappers and placeholders are removed.
-     * How: A class-marked placeholder between paragraphs is cleaned and its absence is asserted.
-     * Why: Broken Confluence attachment markers should not become broken images in Obsidian.
+     * What: Unknown-attachment images are retained for attachment matching.
+     * How: A class-marked placeholder between paragraphs is cleaned and remains present.
+     * Why: Export-view HTML may expose a valid downloaded attachment only through its alt filename.
      */
     #[Test]
-    public function itRemovesUnknownAttachmentImages(): void
+    public function itRetainsUnknownAttachmentImagesForMatching(): void
     {
         // Arrange
         $dirty = <<<'HTML'
@@ -76,8 +76,8 @@ HTML;
         $clean = $this->cleaner->clean($dirty);
 
         // Assert
-        self::assertStringNotContainsString('unknown-attachment', $clean);
-        self::assertStringNotContainsString(
+        self::assertStringContainsString('unknown-attachment', $clean);
+        self::assertStringContainsString(
             '/wiki/plugins/servlet/confluence/placeholder/unknown-attachment',
             $clean,
         );
@@ -86,12 +86,12 @@ HTML;
     }
 
     /**
-     * What: Attachment placeholders are detected and removed by URL as well as by class.
+     * What: URL-marked attachment placeholders remain available for attachment matching.
      * How: A normally classed image with an unknown-attachment URL is cleaned and inspected.
-     * Why: Confluence does not always apply the marker class, so URL detection prevents leaks.
+     * Why: The attachment-aware stage must decide whether the placeholder represents a downloaded image.
      */
     #[Test]
-    public function itRemovesAttachmentPlaceholderImagesByUrl(): void
+    public function itRetainsAttachmentPlaceholderImagesByUrl(): void
     {
         // Arrange
         $dirty = <<<'HTML'
@@ -108,7 +108,7 @@ HTML;
         $clean = $this->cleaner->clean($dirty);
 
         // Assert
-        self::assertStringNotContainsString(
+        self::assertStringContainsString(
             '/placeholder/unknown-attachment',
             $clean,
         );

@@ -10,5 +10,6 @@ final readonly class ImportedAttachment
         public string $id,
         public string $filename,
         public string $content,
+        public ?string $downloadUrl = null,
     ) {}
 }

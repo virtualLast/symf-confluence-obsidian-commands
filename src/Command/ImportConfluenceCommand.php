@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Confluence\ConfluenceImporter;
-use App\Model\ImportedPage;
+use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
 use App\Obsidian\ObsidianAttachmentWriter;
-use App\Obsidian\ObsidianImageLinkBuilderInterface;
 use App\Obsidian\ObsidianPageWriter;
 use Http\Client\Exception as HttpClientException;
 use InvalidArgumentException;
@@ -34,7 +33,7 @@ final class ImportConfluenceCommand extends Command
         private readonly ConfluenceImporter $confluenceImporter,
         private readonly ObsidianPageWriter $obsidianWriter,
         private readonly ObsidianAttachmentWriter $obsidianAttachmentWriter,
-        private readonly ObsidianImageLinkBuilderInterface $obsidianImageLinkBuilder,
+        private readonly ObsidianAttachmentPlaceholderRewriter $attachmentPlaceholderRewriter,
     ) {
         parent::__construct();
     }
@@ -117,14 +116,10 @@ final class ImportConfluenceCommand extends Command
         }
 
         try {
-            $attachmentLinks = [];
-
             foreach ($importedPage->attachments as $attachment) {
-                $attachmentLinks[] = $this->obsidianImageLinkBuilder->build(
-                    $this->obsidianAttachmentWriter->write(
-                        $importedPage,
-                        $attachment,
-                    ),
+                $this->obsidianAttachmentWriter->write(
+                    $importedPage,
+                    $attachment,
                 );
             }
         } catch (IOExceptionInterface | InvalidArgumentException $exception) {
@@ -138,10 +133,7 @@ final class ImportConfluenceCommand extends Command
 
         try {
             $filePath = $this->obsidianWriter->write(
-                $this->withAttachmentLinks(
-                    $importedPage,
-                    $attachmentLinks,
-                ),
+                $this->attachmentPlaceholderRewriter->rewrite($importedPage),
                 $destination,
             );
         } catch (IOExceptionInterface | InvalidArgumentException $exception) {
@@ -162,26 +154,4 @@ final class ImportConfluenceCommand extends Command
         return Command::SUCCESS;
     }
 
-    /** @param list<string> $attachmentLinks */
-    private function withAttachmentLinks(
-        ImportedPage $importedPage,
-        array $attachmentLinks,
-    ): ImportedPage {
-        if ($attachmentLinks === []) {
-            return $importedPage;
-        }
-
-        $content = rtrim($importedPage->content, "\r\n");
-
-        if ($content !== '') {
-            $content .= "\n\n";
-        }
-
-        return new ImportedPage(
-            id: $importedPage->id,
-            title: $importedPage->title,
-            content: $content . implode("\n", $attachmentLinks),
-            attachments: $importedPage->attachments,
-        );
-    }
 }

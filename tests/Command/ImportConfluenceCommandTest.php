@@ -8,6 +8,7 @@ use App\Command\ImportConfluenceCommand;
 use App\Confluence\ConfluenceImporter;
 use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
+use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
 use App\Obsidian\ObsidianAttachmentWriter;
 use App\Obsidian\ObsidianImageLinkBuilder;
 use App\Obsidian\ObsidianImageLinkBuilderInterface;
@@ -119,7 +120,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $importedPage = new ImportedPage(
             id: 123,
             title: 'SSO Overview',
-            content: '# SSO Overview',
+            content: "# SSO Overview\n\n@@OBSIDIAN_ATTACHMENT:att456@@",
             attachments: [
                 new ImportedAttachment(
                     id: '456',
@@ -507,7 +508,10 @@ final class ImportConfluenceCommandTest extends TestCase
             confluenceImporter: $confluenceImporter,
             obsidianWriter: $obsidianWriter,
             obsidianAttachmentWriter: $obsidianAttachmentWriter,
-            obsidianImageLinkBuilder: $obsidianImageLinkBuilder ?? new ObsidianImageLinkBuilder(),
+            attachmentPlaceholderRewriter: new ObsidianAttachmentPlaceholderRewriter(
+                $pathBuilder,
+                $obsidianImageLinkBuilder ?? new ObsidianImageLinkBuilder(),
+            ),
         );
 
         return new CommandTester($command);

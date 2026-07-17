@@ -23,17 +23,6 @@ final class ConfluenceHtmlCleaner extends AbstractConfluenceCleaner
             '//style',
         );
 
-        // Remove placeholder images generated for missing attachments.
-        $this->removeElements(
-            $xpath,
-            '//img[contains(concat(" ", normalize-space(@class), " "), " unknown-attachment ")]',
-        );
-
-        $this->removeElements(
-            $xpath,
-            '//img[contains(@src, "/placeholder/unknown-attachment")]'
-        );
-
         // Remove the expand/collapse control while preserving the expanded content.
         $this->removeElements(
             $xpath,

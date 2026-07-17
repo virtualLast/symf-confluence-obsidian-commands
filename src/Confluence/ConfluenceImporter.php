@@ -56,12 +56,14 @@ readonly class ConfluenceImporter
                     id: (string) $attachment->getId(),
                     filename: (string) $attachment->getTitle(),
                     content: $this->confluenceClient->downloadAttachment($attachment),
+                    downloadUrl: $attachment->getDownloadUrl(),
                 );
             }
         }
 
         $markdown = $this->confluenceContentConverter->toMarkdown(
             $page->getContent() ?? '',
+            $attachments,
         );
 
         return new ImportedPage(

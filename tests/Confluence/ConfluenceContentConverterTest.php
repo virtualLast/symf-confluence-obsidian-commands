@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceContentConverter;
+use App\Model\ImportedAttachment;
 use App\Tests\Traits\FixtureTrait;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -18,6 +19,35 @@ final class ConfluenceContentConverterTest extends TestCase
     protected function setUp(): void
     {
         $this->converter = ConfluenceContentConverterFactory::create();
+    }
+
+    #[Test]
+    public function itPreservesInlineAttachmentPositionAndExternalImages(): void
+    {
+        $markdown = $this->converter->toMarkdown(
+            '<p>Example internal image:</p>'
+            . '<p><img data-linked-resource-id="884637698" src="/wiki/download/attachments/1/internal.jpg"></p>'
+            . '<p>Example external image:</p>'
+            . '<p><img src="https://example.com/external.jpg" alt="External"></p>',
+            [new ImportedAttachment('att884637698', 'internal.jpg', '')],
+        );
+
+        self::assertSame(
+            "Example internal image:\n\n@@OBSIDIAN_ATTACHMENT:att884637698@@\n\n"
+            . "Example external image:\n\n![External](https://example.com/external.jpg)",
+            trim($markdown),
+        );
+    }
+
+    #[Test]
+    public function itPreservesTheAttachmentsMacroPositionAsAPlaceholder(): void
+    {
+        self::assertSame(
+            "Before\n\n@@OBSIDIAN_ATTACHMENT_LIST@@\n\nAfter",
+            trim($this->converter->toMarkdown(
+                '<p>Before</p><div class="error">Error rendering macro \'attachments\' : failure</div><p>After</p>',
+            )),
+        );
     }
 
     /**
