@@ -58,6 +58,26 @@ View the complete command help with:
 php bin/console app:confluence:import --help
 ```
 
+### Attachments
+
+Attachments are opt-in. Download them alongside the page with:
+
+```shell
+php bin/console app:confluence:import 123456789 --with-attachments
+```
+
+Downloaded files are written to `Attachments/Confluence/<page-slug>/` in the vault. Images that Confluence identifies by attachment ID, download URL, or filename are embedded at their original positions. Identified documents such as DOCX and PDF files are linked at their original positions.
+
+Confluence sometimes renders a file as an anonymous `unknown-attachment` without an ID or filename. The importer does not guess which downloaded file belongs there. It inserts an `Inline attachment unavailable` warning at that position instead.
+
+Every downloaded attachment that was not reliably linked inline is listed once under `## Attached documents` at the end of the note. The list uses ordinary Obsidian links so images and documents are not unnecessarily embedded a second time.
+
+### Code blocks
+
+Confluence syntax-highlighter brushes are converted into Markdown fence languages. Common aliases such as `js`, `ts`, `sh`, and `yml` become `javascript`, `typescript`, `bash`, and `yaml` respectively.
+
+This project treats Confluence's `java` brush as `markdown`. This reflects the source documentation, where Markdown examples have been labelled as Java by Confluence, and causes them to render as `markdown` fenced code blocks in Obsidian.
+
 ## Tests
 
 Run the complete test suite with:

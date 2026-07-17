@@ -11,7 +11,7 @@ use App\Model\ImportedPage;
 final readonly class ObsidianAttachmentPlaceholderRewriter
 {
     private const string UNRESOLVED_ATTACHMENT_WARNING = '> [!warning] Inline attachment unavailable'
-        . "\n> The original inline attachment could not be identified. Check **Attached documents** below.";
+        . "\n> The original inline attachment could not be identified.";
 
     public function __construct(
         private ObsidianPathBuilder $pathBuilder,
@@ -28,6 +28,7 @@ final readonly class ObsidianAttachmentPlaceholderRewriter
         }
 
         $unreferencedAttachmentLinks = [];
+        $unreferencedAttachmentIds = [];
 
         foreach ($page->attachments as $attachment) {
             $id = str_starts_with($attachment->id, 'att')
@@ -39,16 +40,18 @@ final readonly class ObsidianAttachmentPlaceholderRewriter
                 ? $this->imageLinkBuilder->build($vaultPath)
                 : $this->buildAttachmentLink($vaultPath, $attachment->filename);
 
-            if (!isset($referencedAttachmentIds[$id])) {
+            if (!isset($referencedAttachmentIds[$id]) && !isset($unreferencedAttachmentIds[$id])) {
                 $unreferencedAttachmentLinks[] = sprintf(
                     '- %s',
                     $this->buildAttachmentLink($vaultPath, $attachment->filename),
                 );
+                $unreferencedAttachmentIds[$id] = true;
             }
         }
 
         $replacements[ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER] =
-            self::UNRESOLVED_ATTACHMENT_WARNING;
+            self::UNRESOLVED_ATTACHMENT_WARNING
+            . ($unreferencedAttachmentLinks === [] ? '' : ' Check **Attached documents** below.');
 
         $contentWithoutAttachmentMacros = str_replace(
             [
@@ -61,7 +64,8 @@ final readonly class ObsidianAttachmentPlaceholderRewriter
         $content = trim(strtr($contentWithoutAttachmentMacros, $replacements));
 
         if ($unreferencedAttachmentLinks !== []) {
-            $content .= "\n\n## Attached documents\n\n"
+            $content .= ($content === '' ? '' : "\n\n")
+                . "## Attached documents\n\n"
                 . implode("\n", $unreferencedAttachmentLinks);
         }
 

@@ -93,9 +93,62 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
 
         self::assertSame(
             "> [!warning] Inline attachment unavailable\n"
-            . "> The original inline attachment could not be identified. Check **Attached documents** below.\n\n"
+            . "> The original inline attachment could not be identified.\n\n"
             . "> [!warning] Inline attachment unavailable\n"
-            . '> The original inline attachment could not be identified. Check **Attached documents** below.',
+            . '> The original inline attachment could not be identified.',
+            $this->createRewriter()->rewrite($page)->content,
+        );
+    }
+
+    public function testItPointsAnUnresolvedAttachmentToTheAppendedDocuments(): void
+    {
+        $page = new ImportedPage(
+            1,
+            'Example',
+            ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER,
+            [new ImportedAttachment('1', 'notes.docx', '')],
+        );
+
+        self::assertSame(
+            "> [!warning] Inline attachment unavailable\n"
+            . "> The original inline attachment could not be identified. Check **Attached documents** below.\n\n"
+            . "## Attached documents\n\n"
+            . '- [[Attachments/Confluence/example/notes.docx|notes.docx]]',
+            $this->createRewriter()->rewrite($page)->content,
+        );
+    }
+
+    public function testItAddsTheAttachmentHeadingWithoutLeadingWhitespaceToAnEmptyPage(): void
+    {
+        $page = new ImportedPage(
+            1,
+            'Example',
+            '',
+            [new ImportedAttachment('1', 'notes.docx', '')],
+        );
+
+        self::assertSame(
+            "## Attached documents\n\n"
+            . '- [[Attachments/Confluence/example/notes.docx|notes.docx]]',
+            $this->createRewriter()->rewrite($page)->content,
+        );
+    }
+
+    public function testItListsDuplicateAttachmentMetadataOnlyOnce(): void
+    {
+        $page = new ImportedPage(
+            1,
+            'Example',
+            'Content',
+            [
+                new ImportedAttachment('1', 'notes.docx', ''),
+                new ImportedAttachment('att1', 'notes.docx', ''),
+            ],
+        );
+
+        self::assertSame(
+            "Content\n\n## Attached documents\n\n"
+            . '- [[Attachments/Confluence/example/notes.docx|notes.docx]]',
             $this->createRewriter()->rewrite($page)->content,
         );
     }
