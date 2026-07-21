@@ -52,6 +52,12 @@ Destinations must be relative paths contained within `OBSIDIAN_VAULT`; absolute 
 
 On success, the command prints the imported page title and full output path. Confluence or filesystem errors are displayed and return a failing exit code.
 
+### Metadata
+
+Every imported note starts with YAML frontmatter containing its Confluence page ID, title, space key, and current version. Links to other Confluence pages are also recorded with their page ID, title, and original URL under `relationships.linkedPages`. External links are not included, and links in the Markdown body are left unchanged.
+
+This metadata makes each note self-identifying for future synchronisation, indexing, and Confluence-to-Obsidian link resolution without requiring a separate database.
+
 View the complete command help with:
 
 ```shell

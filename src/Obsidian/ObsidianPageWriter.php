@@ -15,6 +15,7 @@ final class ObsidianPageWriter extends ObsidianWriter
         string $vaultPath,
         Filesystem $filesystem,
         private readonly ObsidianPathBuilder $pathBuilder,
+        private readonly ObsidianFrontmatterRenderer $frontmatterRenderer,
     ) {
         parent::__construct(
             $filesystem,
@@ -28,7 +29,7 @@ final class ObsidianPageWriter extends ObsidianWriter
     ): string {
         return $this->writeFile(
             $this->buildFilePath($imported, $destination),
-            $imported->content,
+            $this->frontmatterRenderer->render($imported),
         );
     }
 

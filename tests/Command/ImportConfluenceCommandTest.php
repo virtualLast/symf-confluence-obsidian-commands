@@ -10,6 +10,7 @@ use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
 use App\Obsidian\ObsidianAttachmentWriter;
+use App\Obsidian\ObsidianFrontmatterRenderer;
 use App\Obsidian\ObsidianImageLinkBuilder;
 use App\Obsidian\ObsidianImageLinkBuilderInterface;
 use App\Obsidian\ObsidianPageWriter;
@@ -91,7 +92,7 @@ final class ImportConfluenceCommandTest extends TestCase
         self::assertFileExists($expectedFilePath);
 
         self::assertSame(
-            $importedPage->content,
+            new ObsidianFrontmatterRenderer()->render($importedPage),
             file_get_contents($expectedFilePath),
         );
 
@@ -175,7 +176,12 @@ final class ImportConfluenceCommandTest extends TestCase
             ),
         );
         self::assertSame(
-            "# SSO Overview\n\n![[Attachments/Confluence/sso-overview/architecture.png]]",
+            new ObsidianFrontmatterRenderer()->render(new ImportedPage(
+                id: $importedPage->id,
+                title: $importedPage->title,
+                content: "# SSO Overview\n\n![[Attachments/Confluence/sso-overview/architecture.png]]",
+                attachments: $importedPage->attachments,
+            )),
             file_get_contents(
                 $this->vaultPath
                 . DIRECTORY_SEPARATOR
@@ -230,7 +236,7 @@ final class ImportConfluenceCommandTest extends TestCase
         self::assertFileExists($expectedFilePath);
 
         self::assertSame(
-            $importedPage->content,
+            new ObsidianFrontmatterRenderer()->render($importedPage),
             file_get_contents($expectedFilePath),
         );
     }
@@ -497,6 +503,7 @@ final class ImportConfluenceCommandTest extends TestCase
             vaultPath: $this->vaultPath,
             pathBuilder: $pathBuilder,
             filesystem: $this->filesystem,
+            frontmatterRenderer: new ObsidianFrontmatterRenderer(),
         );
         $obsidianAttachmentWriter = new ObsidianAttachmentWriter(
             vaultPath: $this->vaultPath,

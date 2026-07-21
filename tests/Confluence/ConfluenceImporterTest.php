@@ -7,6 +7,7 @@ namespace App\Tests\Confluence;
 use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceImporter;
+use App\Confluence\ConfluenceLinkedPageExtractor;
 use App\Model\ImportedAttachment;
 use App\Model\ImportedPage;
 use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
@@ -44,6 +45,8 @@ class ConfluenceImporterTest extends TestCase
             ->method('getContent')
             ->willReturn($content)
         ;
+        $pageStub->method('getSpace')->willReturn('SD');
+        $pageStub->method('getVersion')->willReturn(17);
 
         $confluenceClientMock = $this->createMock(ConfluenceClient::class);
         $confluenceClientMock
@@ -59,7 +62,11 @@ class ConfluenceImporterTest extends TestCase
         ;
 
         // act
-        $importer = new ConfluenceImporter($confluenceClientMock, $converter);
+        $importer = new ConfluenceImporter(
+            $confluenceClientMock,
+            $converter,
+            new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
+        );
         $importedPage = $importer->importPage($pageId);
 
         // assert
@@ -67,6 +74,8 @@ class ConfluenceImporterTest extends TestCase
         $this->assertSame($pageId, $importedPage->id);
         $this->assertSame($title, $importedPage->title);
         $this->assertSame($content, $importedPage->content);
+        $this->assertSame('SD', $importedPage->spaceKey);
+        $this->assertSame(17, $importedPage->version);
     }
 
     /**
@@ -137,6 +146,7 @@ class ConfluenceImporterTest extends TestCase
         $importedPage = new ConfluenceImporter(
             $confluenceClient,
             $this->createConfluenceContentConverter(),
+            new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
         )->importPage(123, true);
 
         // assert

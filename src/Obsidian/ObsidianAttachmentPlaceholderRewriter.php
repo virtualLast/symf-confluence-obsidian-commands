@@ -74,6 +74,9 @@ final readonly class ObsidianAttachmentPlaceholderRewriter
             title: $page->title,
             content: $content,
             attachments: $page->attachments,
+            spaceKey: $page->spaceKey,
+            version: $page->version,
+            linkedPages: $page->linkedPages,
         );
     }
 

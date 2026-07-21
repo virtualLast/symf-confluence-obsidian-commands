@@ -6,11 +6,17 @@ namespace App\Model;
 
 final readonly class ImportedPage
 {
-    /** @param ImportedAttachment[] $attachments */
+    /**
+     * @param list<ImportedAttachment> $attachments
+     * @param list<ImportedLinkedPage> $linkedPages
+     */
     public function __construct(
         public int $id,
         public string $title,
         public string $content,
         public array $attachments = [],
+        public string $spaceKey = '',
+        public int $version = 1,
+        public array $linkedPages = [],
     ) {}
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Obsidian;
 
 use App\Model\ImportedPage;
+use App\Obsidian\ObsidianFrontmatterRenderer;
 use App\Obsidian\ObsidianPageWriter;
 use App\Obsidian\ObsidianPathBuilder;
 use PHPUnit\Framework\TestCase;
@@ -66,7 +67,7 @@ final class ObsidianWriterTest extends TestCase
         self::assertFileExists($filePath);
 
         self::assertSame(
-            $page->content,
+            new ObsidianFrontmatterRenderer()->render($page),
             file_get_contents($filePath),
         );
     }
@@ -108,7 +109,7 @@ final class ObsidianWriterTest extends TestCase
         self::assertFileExists($filePath);
 
         self::assertSame(
-            $page->content,
+            new ObsidianFrontmatterRenderer()->render($page),
             file_get_contents($filePath),
         );
     }
@@ -195,7 +196,7 @@ final class ObsidianWriterTest extends TestCase
         $writer->write($updatedPage);
 
         self::assertSame(
-            'Updated content.',
+            new ObsidianFrontmatterRenderer()->render($updatedPage),
             file_get_contents($filePath),
         );
     }
@@ -319,6 +320,7 @@ final class ObsidianWriterTest extends TestCase
             vaultPath: 'relative/vault',
             pathBuilder: $this->createPathBuilder(),
             filesystem: $this->filesystem,
+            frontmatterRenderer: new ObsidianFrontmatterRenderer(),
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -333,6 +335,7 @@ final class ObsidianWriterTest extends TestCase
             vaultPath: $this->vaultPath,
             pathBuilder: $this->createPathBuilder(),
             filesystem: $this->filesystem,
+            frontmatterRenderer: new ObsidianFrontmatterRenderer(),
         );
     }
 

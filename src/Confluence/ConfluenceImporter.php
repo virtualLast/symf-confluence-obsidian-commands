@@ -15,6 +15,7 @@ readonly class ConfluenceImporter
     public function __construct(
         private ConfluenceClient $confluenceClient,
         private ConfluenceContentConverter $confluenceContentConverter,
+        private ConfluenceLinkedPageExtractor $linkedPageExtractor,
     ) {}
 
     /**
@@ -67,10 +68,13 @@ readonly class ConfluenceImporter
         );
 
         return new ImportedPage(
-            $importedPageId,
-            $page->getTitle() ?? '',
-            $markdown,
-            $attachments,
+            id: $importedPageId,
+            title: $page->getTitle() ?? '',
+            content: $markdown,
+            attachments: $attachments,
+            spaceKey: $page->getSpace() ?? '',
+            version: $page->getVersion(),
+            linkedPages: $this->linkedPageExtractor->extract($page->getContent() ?? ''),
         );
     }
 }
