@@ -15,7 +15,7 @@ final readonly class ObsidianFrontmatterRenderer
         $metadata = [
             'source' => 'confluence',
             'confluence' => [
-                'pageId' => (string) $page->id,
+                'pageId' => $page->id,
                 'title' => $page->title,
                 'spaceKey' => $page->spaceKey,
                 'version' => $page->version,
@@ -23,7 +23,7 @@ final readonly class ObsidianFrontmatterRenderer
             'relationships' => [
                 'linkedPages' => array_map(
                     static fn(ImportedLinkedPage $linkedPage): array => [
-                        'pageId' => (string) $linkedPage->id,
+                        'pageId' => $linkedPage->id,
                         'title' => $linkedPage->title,
                         'url' => $linkedPage->url,
                     ],

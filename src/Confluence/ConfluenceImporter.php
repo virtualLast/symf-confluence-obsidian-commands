@@ -23,17 +23,13 @@ readonly class ConfluenceImporter
      * @throws ConfluencePhpClientException
      * @throws \JsonException
      */
-    public function importPage(int $pageId, bool $withAttachments = false): ImportedPage
+    public function importPage(string $pageId, bool $withAttachments = false): ImportedPage
     {
         $page = $this->confluenceClient->getPage($pageId);
 
-        $importedPageId = filter_var(
-            $page->getId(),
-            FILTER_VALIDATE_INT,
-            ['options' => ['min_range' => 1]],
-        );
+        $importedPageId = (string) $page->getId();
 
-        if ($importedPageId === false) {
+        if (preg_match('/^[1-9]\d*$/', $importedPageId) !== 1) {
             throw new \UnexpectedValueException(
                 'The Confluence response did not contain a valid page ID.',
             );

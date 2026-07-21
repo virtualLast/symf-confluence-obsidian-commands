@@ -28,7 +28,7 @@ class ConfluenceImporterTest extends TestCase
     {
         // arrange
         $converter = $this->createConfluenceContentConverter();
-        $pageId = 664600597;
+        $pageId = '664600597';
         $title = 'Test page';
         $content = 'Test content';
 
@@ -54,11 +54,6 @@ class ConfluenceImporterTest extends TestCase
             ->method('getPage')
             ->with($pageId)
             ->willReturn($pageStub)
-        ;
-
-        $confluenceClientMock
-            ->expects($this->never())
-            ->method('getPageChildren')
         ;
 
         // act
@@ -129,7 +124,7 @@ class ConfluenceImporterTest extends TestCase
         $confluenceClient
             ->expects(self::once())
             ->method('getPage')
-            ->with(123)
+            ->with('123')
             ->willReturn($page);
         $confluenceClient
             ->expects(self::once())
@@ -147,7 +142,7 @@ class ConfluenceImporterTest extends TestCase
             $confluenceClient,
             $this->createConfluenceContentConverter(),
             new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
-        )->importPage(123, true);
+        )->importPage('123', true);
 
         // assert
         self::assertCount(1, $importedPage->attachments);

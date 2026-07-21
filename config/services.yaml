@@ -22,6 +22,9 @@ services:
     App\Confluence\ConfluenceSdkClientFactoryInterface:
         alias: App\Confluence\ConfluenceSdkClientFactory
 
+    App\Confluence\ConfluencePageImportPipelineInterface:
+        alias: App\Confluence\ConfluencePageImportPipeline
+
     App\Obsidian\ObsidianImageLinkBuilderInterface:
         alias: App\Obsidian\ObsidianImageLinkBuilder
 

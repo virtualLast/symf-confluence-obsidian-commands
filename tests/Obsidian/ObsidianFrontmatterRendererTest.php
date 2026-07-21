@@ -15,14 +15,14 @@ final class ObsidianFrontmatterRendererTest extends TestCase
     public function testItRendersIdentityAndRelationshipsAsYamlFrontmatter(): void
     {
         $page = new ImportedPage(
-            id: 664600597,
+            id: '664600597',
             title: 'SSO Overview',
             content: '# SSO Overview',
             spaceKey: 'SD',
             version: 17,
             linkedPages: [
                 new ImportedLinkedPage(
-                    665747466,
+                    '665747466',
                     'Lightfoot SSO Implementation',
                     'https://lightfoot.atlassian.net/wiki/spaces/SD/pages/665747466',
                 ),
@@ -54,7 +54,7 @@ final class ObsidianFrontmatterRendererTest extends TestCase
     public function testItRendersAnEmptyRelationshipListAsASequence(): void
     {
         $rendered = new ObsidianFrontmatterRenderer()->render(
-            new ImportedPage(123, 'Page', 'Content', spaceKey: 'SD'),
+            new ImportedPage('123', 'Page', 'Content', spaceKey: 'SD'),
         );
 
         self::assertStringContainsString("  linkedPages: []\n", $rendered);

@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ImportConfluenceCommand;
+use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceImporter;
+use App\Confluence\ConfluencePageImportPipeline;
+use App\Confluence\Traversal\ConfluenceImportTraversal;
+use App\Model\ConfluencePageReference;
 use App\Model\ImportedAttachment;
+use App\Model\ImportedLinkedPage;
 use App\Model\ImportedPage;
 use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
 use App\Obsidian\ObsidianAttachmentWriter;
@@ -19,6 +24,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -53,7 +59,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItImportsAPageIntoTheVault(): void
     {
         $importedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: "# SSO Overview\n\nImported content.",
         );
@@ -65,7 +71,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, false)
+            ->with('123', false)
             ->willReturn($importedPage);
 
         $imageLinkBuilder = $this->createMock(
@@ -119,7 +125,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItImportsAPageWithAttachments(): void
     {
         $importedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: "# SSO Overview\n\n@@OBSIDIAN_ATTACHMENT:att456@@",
             attachments: [
@@ -138,7 +144,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, true)
+            ->with('123', true)
             ->willReturn($importedPage);
 
         $imageLinkBuilder = $this->createMock(
@@ -198,7 +204,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItImportsAPageIntoTheRequestedDestination(): void
     {
         $importedPage = new ImportedPage(
-            id: 456,
+            id: '456',
             title: 'Authentication Architecture',
             content: '# Authentication Architecture',
         );
@@ -210,7 +216,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(456, false)
+            ->with('456', false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -249,7 +255,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItImportsAttachmentsIntoTheRequestedDestination(): void
     {
         $importedPage = new ImportedPage(
-            id: 456,
+            id: '456',
             title: 'Authentication Architecture',
             content: '# Authentication Architecture',
             attachments: [
@@ -261,7 +267,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(456, true)
+            ->with('456', true)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester($confluenceImporter);
@@ -296,7 +302,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItReturnsFailureWhenAnAttachmentCannotBeWritten(): void
     {
         $importedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Page content.',
             attachments: [
@@ -308,7 +314,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, true)
+            ->with('123', true)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester($confluenceImporter);
@@ -339,7 +345,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, false)
+            ->with('123', false)
             ->willThrowException(
                 new RuntimeException('Unable to fetch Confluence page.'),
             );
@@ -377,7 +383,7 @@ final class ImportConfluenceCommandTest extends TestCase
         );
 
         $importedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Page content.',
         );
@@ -389,7 +395,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, false)
+            ->with('123', false)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -416,7 +422,7 @@ final class ImportConfluenceCommandTest extends TestCase
     public function testItRejectsADestinationOutsideTheVault(): void
     {
         $importedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Page content.',
             attachments: [
@@ -430,7 +436,7 @@ final class ImportConfluenceCommandTest extends TestCase
         $confluenceImporter
             ->expects(self::once())
             ->method('importPage')
-            ->with(123, true)
+            ->with('123', true)
             ->willReturn($importedPage);
 
         $commandTester = $this->createCommandTester(
@@ -494,9 +500,157 @@ final class ImportConfluenceCommandTest extends TestCase
         yield 'decimal' => ['1.5'];
     }
 
+    /** @param array<string, mixed> $input */
+    #[DataProvider('invalidTraversalOptionProvider')]
+    public function testItRejectsInvalidTraversalOptions(array $input, string $message): void
+    {
+        $importer = $this->createMock(ConfluenceImporter::class);
+        $importer->expects(self::never())->method('importPage');
+
+        $tester = $this->createCommandTester($importer);
+        $exitCode = $tester->execute(['page' => '123', ...$input]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertStringContainsString($message, $tester->getDisplay());
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> */
+    public static function invalidTraversalOptionProvider(): iterable
+    {
+        yield 'depth without strategy' => [['--depth' => '2'], 'requires'];
+        yield 'negative depth' => [['--recursive' => true, '--depth' => '-1'], 'non-negative integer'];
+        yield 'non-integer depth' => [['--follow-links' => true, '--depth' => 'abc'], 'non-negative integer'];
+        yield 'depth outside integer range' => [
+            ['--recursive' => true, '--depth' => '999999999999999999999999'],
+            'outside the supported integer range',
+        ];
+    }
+
+    public function testDepthZeroImportsOnlyTheRootAndPrintsATraversalSummary(): void
+    {
+        $importer = $this->createMock(ConfluenceImporter::class);
+        $importer
+            ->expects(self::once())
+            ->method('importPage')
+            ->with('123', false)
+            ->willReturn(new ImportedPage('123', 'Root', 'Content'));
+        $client = $this->createMock(ConfluenceClient::class);
+        $client->expects(self::never())->method('getChildPages');
+
+        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $exitCode = $tester->execute([
+            'page' => '123',
+            '--recursive' => true,
+            '--depth' => '0',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('Recursive Confluence import complete', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Pages scheduled\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Maximum depth\s+0/', $tester->getDisplay());
+    }
+
+    public function testItImportsDirectChildrenIntoTheSameDestinationWithAttachments(): void
+    {
+        $importer = $this->createMock(ConfluenceImporter::class);
+        $importer
+            ->expects(self::exactly(2))
+            ->method('importPage')
+            ->willReturnCallback(static fn(string $pageId, bool $withAttachments): ImportedPage => new ImportedPage(
+                $pageId,
+                $pageId === '1' ? 'Root' : 'Child',
+                'Content',
+                attachments: $withAttachments ? [new ImportedAttachment('att', $pageId . '.txt', 'file')] : [],
+            ));
+        $client = $this->createMock(ConfluenceClient::class);
+        $client
+            ->expects(self::once())
+            ->method('getChildPages')
+            ->with('1')
+            ->willReturn([new ConfluencePageReference('2', 'Child')]);
+
+        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $exitCode = $tester->execute([
+            'page' => '1',
+            'destination' => 'Inbox/Confluence',
+            '--with-attachments' => true,
+            '--recursive' => true,
+            '--depth' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($this->vaultPath . '/Inbox/Confluence/root.md');
+        self::assertFileExists($this->vaultPath . '/Inbox/Confluence/child.md');
+        self::assertFileExists($this->vaultPath . '/Attachments/Confluence/root/1.txt');
+        self::assertFileExists($this->vaultPath . '/Attachments/Confluence/child/2.txt');
+        self::assertMatchesRegularExpression('/Pages imported\s+2/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Child pages found\s+1/', $tester->getDisplay());
+    }
+
+    public function testItImportsDirectlyLinkedPagesWhenRequested(): void
+    {
+        $importer = $this->createMock(ConfluenceImporter::class);
+        $importer
+            ->expects(self::exactly(2))
+            ->method('importPage')
+            ->willReturnCallback(static fn(string $pageId): ImportedPage => $pageId === '1'
+                ? new ImportedPage('1', 'Root', 'Content', linkedPages: [
+                    new ImportedLinkedPage('2', 'Linked', 'https://example.atlassian.net/wiki/pages/2'),
+                ])
+                : new ImportedPage('2', 'Linked', 'Content'));
+        $client = $this->createMock(ConfluenceClient::class);
+        $client->expects(self::never())->method('getChildPages');
+
+        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $exitCode = $tester->execute([
+            'page' => '1',
+            '--follow-links' => true,
+            '--depth' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertMatchesRegularExpression('/Linked pages found\s+1/', $tester->getDisplay());
+        self::assertFileExists($this->vaultPath . '/linked.md');
+    }
+
+    public function testADescendantFailureReturnsFailureAfterIndependentPagesComplete(): void
+    {
+        $importer = $this->createStub(ConfluenceImporter::class);
+        $importer
+            ->method('importPage')
+            ->willReturnCallback(static function (string $pageId): ImportedPage {
+                if ($pageId === '2') {
+                    throw new RuntimeException('Page unavailable.');
+                }
+
+                return $pageId === '1'
+                    ? new ImportedPage('1', 'Root', 'Content', linkedPages: [
+                        new ImportedLinkedPage('2', 'Failed', 'url-2'),
+                        new ImportedLinkedPage('3', 'Independent', 'url-3'),
+                    ])
+                    : new ImportedPage('3', 'Independent', 'Content');
+            });
+
+        $tester = $this->createCommandTester($importer);
+        $exitCode = $tester->execute(
+            [
+                'page' => '1',
+                '--follow-links' => true,
+                '--depth' => '1',
+            ],
+            ['verbosity' => OutputInterface::VERBOSITY_VERBOSE],
+        );
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertFileExists($this->vaultPath . '/independent.md');
+        self::assertMatchesRegularExpression('/Pages failed\s+1/', $tester->getDisplay());
+        self::assertStringContainsString('import failure for page 2 "Failed"', $tester->getDisplay());
+    }
+
     private function createCommandTester(
         ConfluenceImporter $confluenceImporter,
         ?ObsidianImageLinkBuilderInterface $obsidianImageLinkBuilder = null,
+        ?ConfluenceClient $confluenceClient = null,
     ): CommandTester {
         $pathBuilder = new ObsidianPathBuilder(new AsciiSlugger());
         $obsidianWriter = new ObsidianPageWriter(
@@ -511,13 +665,20 @@ final class ImportConfluenceCommandTest extends TestCase
             pathBuilder: $pathBuilder,
         );
 
-        $command = new ImportConfluenceCommand(
+        $pipeline = new ConfluencePageImportPipeline(
             confluenceImporter: $confluenceImporter,
-            obsidianWriter: $obsidianWriter,
-            obsidianAttachmentWriter: $obsidianAttachmentWriter,
+            pageWriter: $obsidianWriter,
+            attachmentWriter: $obsidianAttachmentWriter,
             attachmentPlaceholderRewriter: new ObsidianAttachmentPlaceholderRewriter(
                 $pathBuilder,
                 $obsidianImageLinkBuilder ?? new ObsidianImageLinkBuilder(),
+            ),
+        );
+        $command = new ImportConfluenceCommand(
+            importPipeline: $pipeline,
+            importTraversal: new ConfluenceImportTraversal(
+                $pipeline,
+                $confluenceClient ?? $this->createStub(ConfluenceClient::class),
             ),
         );
 

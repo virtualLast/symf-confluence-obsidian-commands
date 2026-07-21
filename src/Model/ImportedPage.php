@@ -11,7 +11,7 @@ final readonly class ImportedPage
      * @param list<ImportedLinkedPage> $linkedPages
      */
     public function __construct(
-        public int $id,
+        public string $id,
         public string $title,
         public string $content,
         public array $attachments = [],

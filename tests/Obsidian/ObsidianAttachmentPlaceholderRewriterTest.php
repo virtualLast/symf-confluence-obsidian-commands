@@ -18,7 +18,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItRewritesMultiplePlaceholdersAndAppendsUnreferencedAttachments(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Mike Test Document',
             "Before\n\n@@OBSIDIAN_ATTACHMENT:att884637698@@\n\nMiddle\n\n"
             . "@@OBSIDIAN_ATTACHMENT:att2@@\n\nAfter @@OBSIDIAN_ATTACHMENT-ish:att2@@",
@@ -47,7 +47,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItListsAllUnreferencedAttachmentsAtTheEnd(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Mike Test Document',
             "Inline:\n\n@@OBSIDIAN_ATTACHMENT:att1@@\n\nAttachments:\n\n@@OBSIDIAN_ATTACHMENT_LIST@@\n\nAfter",
             [
@@ -74,7 +74,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItLinksAnInlineDocumentWithoutAddingItToTheFooter(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Mike Test Document',
             '@@OBSIDIAN_ATTACHMENT:att1@@',
             [new ImportedAttachment('1', 'notes.docx', '')],
@@ -89,7 +89,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItReplacesEveryUnresolvedAttachmentWithAWarning(): void
     {
         $placeholder = ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER;
-        $page = new ImportedPage(1, 'Example', $placeholder . "\n\n" . $placeholder, []);
+        $page = new ImportedPage('1', 'Example', $placeholder . "\n\n" . $placeholder, []);
 
         self::assertSame(
             "> [!warning] Inline attachment unavailable\n"
@@ -103,7 +103,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItPointsAnUnresolvedAttachmentToTheAppendedDocuments(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Example',
             ConfluenceImagePlaceholderTransformer::UNRESOLVED_ATTACHMENT_PLACEHOLDER,
             [new ImportedAttachment('1', 'notes.docx', '')],
@@ -121,7 +121,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItAddsTheAttachmentHeadingWithoutLeadingWhitespaceToAnEmptyPage(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Example',
             '',
             [new ImportedAttachment('1', 'notes.docx', '')],
@@ -137,7 +137,7 @@ final class ObsidianAttachmentPlaceholderRewriterTest extends TestCase
     public function testItListsDuplicateAttachmentMetadataOnlyOnce(): void
     {
         $page = new ImportedPage(
-            1,
+            '1',
             'Example',
             'Content',
             [

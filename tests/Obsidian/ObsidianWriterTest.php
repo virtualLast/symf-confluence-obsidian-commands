@@ -50,7 +50,7 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $page = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: "# SSO Overview\n\nPage content.",
         );
@@ -82,7 +82,7 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $page = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: "# SSO Overview\n\nPage content.",
         );
@@ -124,7 +124,7 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $page = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Page content.',
         );
@@ -155,7 +155,7 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $page = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'OAuth, OIDC & SSO Implementation',
             content: 'Page content.',
         );
@@ -180,13 +180,13 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $originalPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Original content.',
         );
 
         $updatedPage = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Updated content.',
         );
@@ -211,7 +211,7 @@ final class ObsidianWriterTest extends TestCase
         $writer = $this->createWriter();
 
         $page = new ImportedPage(
-            id: 123,
+            id: '123',
             title: 'SSO Overview',
             content: 'Page content.',
         );
@@ -233,7 +233,7 @@ final class ObsidianWriterTest extends TestCase
     public function testItRejectsParentDirectoryTraversal(): void
     {
         $writer = $this->createWriter();
-        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+        $page = new ImportedPage('123', 'SSO Overview', 'Page content.');
 
         $outsidePath = $this->vaultPath . '-outside';
         $this->additionalCleanupPaths[] = $outsidePath;
@@ -257,7 +257,7 @@ final class ObsidianWriterTest extends TestCase
         }
 
         $writer = $this->createWriter();
-        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+        $page = new ImportedPage('123', 'SSO Overview', 'Page content.');
         $outsidePath = $this->vaultPath . '-outside';
         $this->additionalCleanupPaths[] = $outsidePath;
 
@@ -278,7 +278,7 @@ final class ObsidianWriterTest extends TestCase
     public function testItHandlesMixedDestinationSeparators(): void
     {
         $writer = $this->createWriter();
-        $page = new ImportedPage(123, 'SSO Overview', 'Page content.');
+        $page = new ImportedPage('123', 'SSO Overview', 'Page content.');
 
         $filePath = $writer->write($page, 'Areas\\Engineering/SSO');
 
@@ -298,7 +298,7 @@ final class ObsidianWriterTest extends TestCase
     public function testItUsesADatedFallbackForAnEmptySlug(): void
     {
         $writer = $this->createWriter();
-        $page = new ImportedPage(123, '!!!', 'Page content.');
+        $page = new ImportedPage('123', '!!!', 'Page content.');
 
         $filePath = $writer->write($page);
 
@@ -326,7 +326,7 @@ final class ObsidianWriterTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('must be a non-empty absolute path');
 
-        $writer->write(new ImportedPage(123, 'Page', 'Content'));
+        $writer->write(new ImportedPage('123', 'Page', 'Content'));
     }
 
     private function createWriter(): ObsidianPageWriter

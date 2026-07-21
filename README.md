@@ -96,6 +96,33 @@ Confluence sometimes renders a file as an anonymous `unknown-attachment` without
 
 Every downloaded attachment that was not reliably linked inline is listed once under `## Attached documents` at the end of the note. The list uses ordinary Obsidian links so images and documents are not unnecessarily embedded a second time.
 
+### Recursive imports
+
+Follow the Confluence child-page hierarchy from a root page with:
+
+```shell
+php bin/console app:confluence:import 123456789 Inbox/Confluence --recursive
+```
+
+Follow Confluence pages linked from each imported page with:
+
+```shell
+php bin/console app:confluence:import 123456789 Inbox/Confluence --follow-links
+```
+
+Both strategies can be combined and constrained to a shared maximum depth:
+
+```shell
+php bin/console app:confluence:import 123456789 Inbox/Confluence \
+    --recursive \
+    --follow-links \
+    --depth=2
+```
+
+The root page is depth zero. Pages at the maximum depth are imported but are not expanded. Without `--depth`, traversal continues until no newly discovered page IDs remain. Breadth-first traversal imports each page at most once per command, even when cycles exist or a page is discovered through both hierarchy and links.
+
+The destination and `--with-attachments` setting apply to every imported page. A failed descendant is reported while independent queued branches continue; root-page failures stop traversal immediately. Use `-v` for per-page traversal and failure details.
+
 ### Code blocks
 
 Confluence syntax-highlighter brushes are converted into Markdown fence languages. Common aliases such as `js`, `ts`, `sh`, and `yml` become `javascript`, `typescript`, `bash`, and `yaml` respectively.

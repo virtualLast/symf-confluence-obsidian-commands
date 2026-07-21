@@ -7,7 +7,7 @@ namespace App\Model;
 final readonly class ImportedLinkedPage
 {
     public function __construct(
-        public int $id,
+        public string $id,
         public string $title,
         public string $url,
     ) {}

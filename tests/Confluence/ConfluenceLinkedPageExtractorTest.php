@@ -29,13 +29,13 @@ final class ConfluenceLinkedPageExtractorTest extends TestCase
         )->extract($html);
 
         self::assertCount(2, $links);
-        self::assertSame(665747466, $links[0]->id);
+        self::assertSame('665747466', $links[0]->id);
         self::assertSame('Lightfoot SSO Implementation', $links[0]->title);
         self::assertSame(
             'https://lightfoot.atlassian.net/wiki/spaces/SD/pages/665747466/Lightfoot+SSO+Implementation',
             $links[0]->url,
         );
-        self::assertSame(665223176, $links[1]->id);
+        self::assertSame('665223176', $links[1]->id);
         self::assertSame('SSO Issues', $links[1]->title);
     }
 

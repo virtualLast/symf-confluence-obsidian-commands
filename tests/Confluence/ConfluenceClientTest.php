@@ -40,9 +40,9 @@ final class ConfluenceClientTest extends TestCase
         $contentApi = $this->createMock(Content::class);
         $contentApi
             ->expects(self::once())
-            ->method('get')
-            ->with(123)
-            ->willReturn($page);
+            ->method('find')
+            ->with(['id' => '123'], 1)
+            ->willReturn((new ContentSearchResult())->setResults([$page]));
         $contentApi
             ->expects(self::once())
             ->method('convert')
@@ -58,7 +58,7 @@ final class ConfluenceClientTest extends TestCase
 
         $client = $this->createClient($contentApi);
 
-        $result = $client->getPage(123);
+        $result = $client->getPage('123');
 
         self::assertSame($page, $result);
         self::assertSame('<h1>Architecture</h1>', $result->getContent());
@@ -75,7 +75,9 @@ final class ConfluenceClientTest extends TestCase
         $renderedBody = (new ContentBody())->setValue('');
 
         $contentApi = $this->createMock(Content::class);
-        $contentApi->method('get')->willReturn($page);
+        $contentApi
+            ->method('find')
+            ->willReturn((new ContentSearchResult())->setResults([$page]));
         $contentApi
             ->expects(self::once())
             ->method('convert')
@@ -88,9 +90,30 @@ final class ConfluenceClientTest extends TestCase
             )
             ->willReturn($renderedBody);
 
-        $result = $this->createClient($contentApi)->getPage(123);
+        $result = $this->createClient($contentApi)->getPage('123');
 
         self::assertSame('', $result->getContent());
+    }
+
+    public function testItLooksUpPageIdsBeyondThePhpIntegerRangeAsStrings(): void
+    {
+        $pageId = '999999999999999999999999';
+        $page = (new ContentPage())->setId($pageId)->setTitle('Large ID')->setContent('Storage');
+        $contentApi = $this->createMock(Content::class);
+        $contentApi
+            ->expects(self::once())
+            ->method('find')
+            ->with(['id' => $pageId], 1)
+            ->willReturn((new ContentSearchResult())->setResults([$page]));
+        $contentApi
+            ->expects(self::once())
+            ->method('convert')
+            ->willReturn((new ContentBody())->setValue('Rendered'));
+
+        $result = $this->createClient($contentApi)->getPage($pageId);
+
+        self::assertSame($pageId, $result->getId());
+        self::assertSame('Rendered', $result->getContent());
     }
 
     /**
@@ -103,14 +126,14 @@ final class ConfluenceClientTest extends TestCase
         $contentApi = $this->createMock(Content::class);
         $contentApi
             ->expects(self::once())
-            ->method('get')
-            ->with(404)
-            ->willReturn(null);
+            ->method('find')
+            ->with(['id' => '404'], 1)
+            ->willReturn(new ContentSearchResult());
 
         $this->expectException(ConfluencePhpClientException::class);
         $this->expectExceptionMessage('Confluence page 404 was not found.');
 
-        $this->createClient($contentApi)->getPage(404);
+        $this->createClient($contentApi)->getPage('404');
     }
 
     /**
@@ -124,11 +147,11 @@ final class ConfluenceClientTest extends TestCase
         $contentApi = $this->createMock(Content::class);
         $contentApi
             ->expects(self::once())
-            ->method('get')
+            ->method('find')
             ->willThrowException($httpException);
 
         try {
-            $this->createClient($contentApi)->getPage(123);
+            $this->createClient($contentApi)->getPage('123');
             self::fail('Expected the adapter to translate the HTTP exception.');
         } catch (ConfluencePhpClientException $exception) {
             self::assertSame('Network unavailable.', $exception->getMessage());
@@ -136,25 +159,66 @@ final class ConfluenceClientTest extends TestCase
         }
     }
 
-    /**
-     * What: Child-page requests use the SDK page-child endpoint and page content type.
-     * How: The page and expected type are asserted against a mocked children response.
-     * Why: Child discovery must not accidentally request attachments or another content type.
-     */
-    public function testItFetchesPageChildren(): void
+    public function testItFetchesEveryPageOfChildReferencesInApiOrder(): void
     {
-        $page = (new ContentPage())->setId(123);
-        $children = new ContentSearchResult();
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->expects(self::once())
-            ->method('children')
-            ->with($page, Content::CONTENT_TYPE_PAGE)
-            ->willReturn($children);
+        $requestedUris = [];
+        $responses = [
+            new Response(200, [], json_encode([
+                'results' => [
+                    ['id' => '999999999999999999999', 'type' => 'page', 'title' => 'First'],
+                    ['id' => '2', 'type' => 'page', 'title' => 'Second'],
+                ],
+                '_links' => ['next' => '/rest/api/content/1/child/page?start=2'],
+            ], JSON_THROW_ON_ERROR)),
+            new Response(200, [], json_encode([
+                'results' => [
+                    ['id' => '3', 'type' => 'page', 'title' => 'Third'],
+                ],
+                '_links' => [],
+            ], JSON_THROW_ON_ERROR)),
+        ];
+        $httpClient = $this->createMock(HttpMethodsClientInterface::class);
+        $httpClient
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->willReturnCallback(static function (string $uri) use (&$requestedUris, &$responses): Response {
+                $requestedUris[] = $uri;
+                $response = array_shift($responses);
 
-        $result = $this->createClient($contentApi)->getPageChildren($page);
+                if ($response === null) {
+                    throw new \LogicException('No child-page response was configured.');
+                }
 
-        self::assertSame($children, $result);
+                return $response;
+            });
+
+        $children = $this->createClientWithHttpClient($httpClient)->getChildPages('1');
+
+        self::assertSame(
+            [
+                '/rest/api/content/1/child/page?start=0&limit=100',
+                '/rest/api/content/1/child/page?start=2&limit=100',
+            ],
+            $requestedUris,
+        );
+        self::assertSame(
+            ['999999999999999999999', '2', '3'],
+            array_map(static fn($child): string => $child->id, $children),
+        );
+        self::assertSame(['First', 'Second', 'Third'], array_map(static fn($child): ?string => $child->title, $children));
+    }
+
+    public function testItRejectsAnInvalidChildPageId(): void
+    {
+        $httpClient = $this->createStub(HttpMethodsClientInterface::class);
+        $httpClient->method('get')->willReturn(new Response(200, [], json_encode([
+            'results' => [['id' => 'invalid', 'type' => 'page', 'title' => 'Broken']],
+        ], JSON_THROW_ON_ERROR)));
+
+        $this->expectException(ConfluencePhpClientException::class);
+        $this->expectExceptionMessage('invalid child page ID');
+
+        $this->createClientWithHttpClient($httpClient)->getChildPages('1');
     }
 
     /**

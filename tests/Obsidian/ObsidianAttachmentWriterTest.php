@@ -142,6 +142,6 @@ final class ObsidianAttachmentWriterTest extends TestCase
 
     private function createPage(): ImportedPage
     {
-        return new ImportedPage(123, 'Mike Test Document', 'Content');
+        return new ImportedPage('123', 'Mike Test Document', 'Content');
     }
 }

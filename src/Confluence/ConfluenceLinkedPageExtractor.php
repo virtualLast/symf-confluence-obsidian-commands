@@ -24,11 +24,17 @@ final class ConfluenceLinkedPageExtractor extends AbstractConfluenceDomDocument
         foreach ($document->getElementsByTagName('a') as $anchor) {
             $linkedPage = $this->extractLink($anchor);
 
-            if ($linkedPage === null || isset($linkedPages[$linkedPage->id])) {
+            if ($linkedPage === null) {
                 continue;
             }
 
-            $linkedPages[$linkedPage->id] = $linkedPage;
+            $pageKey = 'page:' . $linkedPage->id;
+
+            if (isset($linkedPages[$pageKey])) {
+                continue;
+            }
+
+            $linkedPages[$pageKey] = $linkedPage;
         }
 
         return array_values($linkedPages);
@@ -72,7 +78,7 @@ final class ConfluenceLinkedPageExtractor extends AbstractConfluenceDomDocument
         );
     }
 
-    private function pageIdFromUrl(string $url): ?int
+    private function pageIdFromUrl(string $url): ?string
     {
         if (!$this->isConfluenceUrl($url)) {
             return null;
@@ -131,19 +137,15 @@ final class ConfluenceLinkedPageExtractor extends AbstractConfluenceDomDocument
         return rtrim($this->confluenceBaseUrl, '/') . '/' . $url;
     }
 
-    private function positiveInteger(mixed $value): ?int
+    private function positiveInteger(mixed $value): ?string
     {
         if (!is_int($value) && !is_string($value)) {
             return null;
         }
 
-        $pageId = filter_var(
-            $value,
-            FILTER_VALIDATE_INT,
-            ['options' => ['min_range' => 1]],
-        );
+        $pageId = (string) $value;
 
-        return $pageId === false ? null : $pageId;
+        return preg_match('/^[1-9]\d*$/', $pageId) === 1 ? $pageId : null;
     }
 
     private function firstNonEmpty(string ...$values): string
