@@ -58,6 +58,24 @@ Every imported note starts with YAML frontmatter containing its Confluence page 
 
 This metadata makes each note self-identifying for future synchronisation, indexing, and Confluence-to-Obsidian link resolution without requiring a separate database.
 
+### Resolving Confluence links
+
+After importing pages, convert links between imported Confluence notes into native Obsidian wikilinks:
+
+```shell
+php bin/console app:obsidian:resolve-confluence-links
+```
+
+By default, the resolver recursively processes Markdown notes beneath `Inbox/Confluence` in the configured vault. Supply another vault-relative directory when needed:
+
+```shell
+php bin/console app:obsidian:resolve-confluence-links Inbox/Testing
+```
+
+The resolver indexes only notes marked with `source: confluence`, matches them by `confluence.pageId`, and uses the recorded relationship URLs to identify links in each note body. Links to pages that have not been imported remain unchanged. Frontmatter is preserved, only changed files are written, and repeated runs are safe.
+
+Duplicate Confluence page IDs make the index ambiguous, so the command reports them and stops before changing any files. Use `-v` to list invalid notes, duplicate paths, unresolved page IDs, and updated files.
+
 View the complete command help with:
 
 ```shell
