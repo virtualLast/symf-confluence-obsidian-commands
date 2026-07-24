@@ -30,7 +30,7 @@ final readonly class ConfluenceLinkResolver
                 continue;
             }
 
-            $targetsByUrl[$relationship->url] = [$relationship, $target];
+            $targetsByUrl[$this->urlMatchKey($relationship->url)] = [$relationship, $target];
         }
 
         [$frontmatter, $body] = $this->splitFrontmatter($content);
@@ -151,12 +151,15 @@ final readonly class ConfluenceLinkResolver
             ) {
                 $link = $this->parseLink($line, $offset);
 
-                if ($link !== null && isset($targetsByUrl[$link['destination']])) {
-                    [$relationship, $target] = $targetsByUrl[$link['destination']];
+                $targetKey = $link === null ? null : $this->urlMatchKey($link['destination']);
+
+                if ($link !== null && $targetKey !== null && isset($targetsByUrl[$targetKey])) {
+                    [$relationship, $target] = $targetsByUrl[$targetKey];
                     $label = trim($link['label']) === '' ? $relationship->title : $link['label'];
+                    $targetPath = $target->wikilinkPath() . $this->wikilinkFragment($link['destination']);
                     $replacement = $label === ''
-                        ? sprintf('[[%s]]', $target->wikilinkPath())
-                        : sprintf('[[%s|%s]]', $target->wikilinkPath(), $this->escapeAlias($label));
+                        ? sprintf('[[%s]]', $targetPath)
+                        : sprintf('[[%s|%s]]', $targetPath, $this->escapeAlias($label));
 
                     $rewritten .= $replacement;
                     $offset = $link['end'];
@@ -272,5 +275,39 @@ final readonly class ConfluenceLinkResolver
     private function escapeAlias(string $label): string
     {
         return preg_replace('/(?<!\\\\)\|/', '\\\\|', $label) ?? $label;
+    }
+
+    /**
+     * Confluence emits root-relative links in page content while relationship
+     * metadata contains absolute URLs. Match their path and query components
+     * so both representations resolve to the same imported page.
+     */
+    private function urlMatchKey(string $url): string
+    {
+        $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $path = parse_url($url, PHP_URL_PATH);
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        if (!is_string($path)) {
+            return $url;
+        }
+
+        return rtrim($path, '/') . (is_string($query) && $query !== '' ? '?' . $query : '');
+    }
+
+    private function wikilinkFragment(string $url): string
+    {
+        $fragment = parse_url(
+            html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            PHP_URL_FRAGMENT,
+        );
+
+        if (!is_string($fragment) || $fragment === '') {
+            return '';
+        }
+
+        // Confluence heading fragments use hyphens where Obsidian wikilinks
+        // use the visible heading text.
+        return '#' . str_replace('-', ' ', rawurldecode($fragment));
     }
 }

@@ -17,6 +17,7 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
     {
         $document = $this->loadFragment($html);
         $xpath = new DOMXPath($document);
+        $this->transformAttachmentLinks($xpath, $attachments);
         $images = $xpath->query('//img');
 
         if ($images === false) {
@@ -41,17 +42,55 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
                 continue;
             }
 
-            $placeholder = sprintf(
-                '@@OBSIDIAN_ATTACHMENT:att%s@@',
-                $this->normaliseAttachmentId($attachment->id),
-            );
             $image->parentNode?->replaceChild(
-                $document->createTextNode($placeholder),
+                $document->createTextNode($this->attachmentPlaceholder($attachment)),
                 $image,
             );
         }
 
         return $this->innerHtml($document->documentElement);
+    }
+
+    /** @param list<ImportedAttachment> $attachments */
+    private function transformAttachmentLinks(DOMXPath $xpath, array $attachments): void
+    {
+        $links = $xpath->query('//a[contains(@href, "/download/attachments/")]');
+
+        if ($links === false) {
+            return;
+        }
+
+        foreach (iterator_to_array($links) as $link) {
+            if (!$link instanceof DOMElement) {
+                continue;
+            }
+
+            $attachment = $this->matchingAttachmentUrl($link->getAttribute('href'), $attachments);
+
+            if ($attachment === null) {
+                continue;
+            }
+
+            $document = $link->ownerDocument;
+
+            if ($document === null) {
+                continue;
+            }
+
+            $placeholder = $this->attachmentPlaceholder($attachment);
+
+            if (
+                $link->nextSibling !== null
+                && preg_match('/^\s/u', $link->nextSibling->textContent) !== 1
+            ) {
+                $placeholder .= ' ';
+            }
+
+            $link->parentNode?->replaceChild(
+                $document->createTextNode($placeholder),
+                $link,
+            );
+        }
     }
 
     private function isInternalImage(DOMElement $image): bool
@@ -116,6 +155,29 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
         return null;
     }
 
+    /** @param list<ImportedAttachment> $attachments */
+    private function matchingAttachmentUrl(string $url, array $attachments): ?ImportedAttachment
+    {
+        $url = html_entity_decode(trim($url));
+
+        foreach ($attachments as $attachment) {
+            if ($attachment->downloadUrl !== null && $this->urlsMatch($url, $attachment->downloadUrl)) {
+                return $attachment;
+            }
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        $filename = is_string($path) ? rawurldecode(basename($path)) : '';
+
+        foreach ($attachments as $attachment) {
+            if ($filename !== '' && $attachment->filename === $filename) {
+                return $attachment;
+            }
+        }
+
+        return null;
+    }
+
     private function urlsMatch(string $source, string $downloadUrl): bool
     {
         if ($source === $downloadUrl) {
@@ -133,5 +195,13 @@ final class ConfluenceImagePlaceholderTransformer extends AbstractConfluenceDomD
     private function normaliseAttachmentId(string $id): string
     {
         return str_starts_with($id, 'att') ? substr($id, 3) : $id;
+    }
+
+    private function attachmentPlaceholder(ImportedAttachment $attachment): string
+    {
+        return sprintf(
+            '@@OBSIDIAN_ATTACHMENT:att%s@@',
+            $this->normaliseAttachmentId($attachment->id),
+        );
     }
 }

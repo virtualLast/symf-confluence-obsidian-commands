@@ -70,6 +70,53 @@ class MarkdownCleanerTest extends TestCase
         );
     }
 
+    /**
+     * What: Placeholder text emitted by unresolved Jira macros is discarded.
+     * How: Standalone and list-item Jira links are cleaned while fenced examples remain exact.
+     * Why: "Getting issue details... STATUS" is Confluence UI debris, not authored page content.
+     */
+    public function testItRemovesJiraMacroPlaceholderTextOutsideCodeFences(): void
+    {
+        $placeholder = '[LF-13220](https://example.atlassian.net/browse/LF-13220) - Getting issue details... STATUS';
+        $input = "{$placeholder}\n- {$placeholder}\n\n```markdown\n{$placeholder}\n```\n";
+        $expected = "[LF-13220](https://example.atlassian.net/browse/LF-13220)\n"
+            . "- [LF-13220](https://example.atlassian.net/browse/LF-13220)\n\n"
+            . "```markdown\n{$placeholder}\n```\n";
+
+        self::assertSame($expected, $this->cleaner->clean($input));
+    }
+
+    public function testItRemovesAJiraMacroPlaceholderEmbeddedInProse(): void
+    {
+        $input = 'Merge [LF-13252](https://example.test/LF-13252)'
+            . " - Getting issue details... STATUS  into `develop`.\n"
+            . 'Tracked by [LF-13290](https://example.test/LF-13290)'
+            . " - Getting issue details... STATUS .\n";
+        $expected = "Merge [LF-13252](https://example.test/LF-13252) into `develop`.\n"
+            . "Tracked by [LF-13290](https://example.test/LF-13290).\n";
+
+        self::assertSame($expected, $this->cleaner->clean($input));
+    }
+
+    /**
+     * What: HTML entities left in converted prose are restored to readable characters.
+     * How: Text, a table cell, and a URL are cleaned while a fenced sample is unchanged.
+     * Why: Imported notes should display "&" and ">" rather than Confluence serialization details.
+     */
+    public function testItDecodesHtmlEntitiesOutsideCodeFences(): void
+    {
+        $input = "Stanley Black &amp; Decker\n"
+            . "| Route | portal &gt; API |\n"
+            . "[Logs](https://example.com/?one=1&amp;two=2)\n\n"
+            . "```html\n&amp;\n```\n";
+        $expected = "Stanley Black & Decker\n"
+            . "| Route | portal > API |\n"
+            . "[Logs](https://example.com/?one=1&two=2)\n\n"
+            . "```html\n&amp;\n```\n";
+
+        self::assertSame($expected, $this->cleaner->clean($input));
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function cleaningFixtureProvider(): iterable
     {

@@ -116,4 +116,46 @@ final class ConfluenceImagePlaceholderTransformerTest extends TestCase
             ),
         );
     }
+
+    public function testItReplacesAFileMacroThumbnailLinkWithAnAttachmentPlaceholder(): void
+    {
+        $html = '<a href="/wiki/download/attachments/123/report.docx?version=2">'
+            . '<img src="/wiki/download/thumbnails/123/report.docx?version=2"></a>';
+
+        self::assertSame(
+            '@@OBSIDIAN_ATTACHMENT:att42@@',
+            $this->transformer->transform(
+                $html,
+                [new ImportedAttachment('42', 'report.docx', 'document')],
+            ),
+        );
+    }
+
+    public function testItReplacesATextDownloadLinkWithAnAttachmentPlaceholder(): void
+    {
+        $html = '<p><a href="/wiki/download/attachments/123/walkthrough.mp4?version=1">'
+            . 'walkthrough.mp4</a></p>';
+
+        self::assertSame(
+            '<p>@@OBSIDIAN_ATTACHMENT:att42@@</p>',
+            $this->transformer->transform(
+                $html,
+                [new ImportedAttachment('42', 'walkthrough.mp4', 'video')],
+            ),
+        );
+    }
+
+    public function testItSeparatesAnAttachmentPlaceholderFromFollowingText(): void
+    {
+        $html = '<p><a href="/wiki/download/attachments/123/walkthrough.mp4">'
+            . 'walkthrough.mp4</a>If you need access, ask.</p>';
+
+        self::assertSame(
+            '<p>@@OBSIDIAN_ATTACHMENT:att42@@ If you need access, ask.</p>',
+            $this->transformer->transform(
+                $html,
+                [new ImportedAttachment('42', 'walkthrough.mp4', 'video')],
+            ),
+        );
+    }
 }

@@ -90,6 +90,54 @@ final class ConfluenceLinkResolverTest extends TestCase
         self::assertSame($first->content, $second->content);
     }
 
+    public function testItResolvesARootRelativeConfluenceUrlAgainstAnAbsoluteRelationshipUrl(): void
+    {
+        $content = $this->frontmatter('123')
+            . '[Target](/wiki/spaces/SD/pages/456/Target+(Page))';
+
+        $result = $this->resolver()->resolve($this->source(), $this->index(), $content);
+
+        self::assertSame(1, $result->linksResolved);
+        self::assertStringEndsWith(
+            '[[Inbox/Confluence/Nested/target|Target]]',
+            $result->content,
+        );
+    }
+
+    public function testItPreservesAHeadingFragmentWhenResolvingALink(): void
+    {
+        $content = $this->frontmatter('123')
+            . '[Target section](/wiki/spaces/SD/pages/456/Target+(Page)#Testing-Summary)';
+
+        $result = $this->resolver()->resolve($this->source(), $this->index(), $content);
+
+        self::assertSame(1, $result->linksResolved);
+        self::assertStringEndsWith(
+            '[[Inbox/Confluence/Nested/target#Testing Summary|Target section]]',
+            $result->content,
+        );
+    }
+
+    public function testItPreservesAHeadingFragmentOnASamePageLink(): void
+    {
+        $source = $this->source(new ConfluenceRelationship(
+            '123',
+            'Testing Summary Section',
+            'https://example.atlassian.net/wiki/spaces/SD/pages/123/Source#Testing-Summary',
+        ));
+        $index = new ConfluencePageIndex([$source], []);
+        $content = $this->frontmatter('123')
+            . '[Testing Summary Section](/wiki/spaces/SD/pages/123/Source#Testing-Summary)';
+
+        $result = $this->resolver()->resolve($source, $index, $content);
+
+        self::assertSame(1, $result->linksResolved);
+        self::assertStringEndsWith(
+            '[[Inbox/Confluence/source#Testing Summary|Testing Summary Section]]',
+            $result->content,
+        );
+    }
+
     private function resolver(): ConfluenceLinkResolver
     {
         return new ConfluenceLinkResolver();

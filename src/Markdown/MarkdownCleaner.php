@@ -102,7 +102,7 @@ final class MarkdownCleaner
                 $pendingBlankLine,
             );
 
-            $cleanedLines[] = $line;
+            $cleanedLines[] = $this->cleanProseLine($line);
         }
 
         $this->appendPendingBlankLine(
@@ -143,6 +143,27 @@ final class MarkdownCleaner
             '/^\s*Error rendering macro\s+[\'\"][^\'\"]+[\'\"]\s*:\s*.+\s*$/',
             $line,
         ) === 1;
+    }
+
+    /**
+     * Removes text emitted by Confluence macros rather than authored page
+     * content and decodes entities left behind by HTML-to-Markdown conversion.
+     */
+    private function cleanProseLine(string $line): string
+    {
+        $line = preg_replace_callback(
+            '/[ \t]+-[ \t]+Getting issue details\.\.\.[ \t]+STATUS\b([ \t]*)([.,;:]?)/',
+            static fn(array $matches): string => $matches[2] !== ''
+                ? $matches[2]
+                : ($matches[1] !== '' ? ' ' : ''),
+            $line,
+        ) ?? $line;
+
+        return str_replace(
+            ['&amp;', '&gt;', '&lt;', '&quot;', '&#039;'],
+            ['&', '>', '<', '"', "'"],
+            $line,
+        );
     }
 
     /**
