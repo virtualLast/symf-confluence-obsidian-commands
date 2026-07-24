@@ -5,312 +5,265 @@ declare(strict_types=1);
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceRequestException;
 use App\Confluence\ConfluenceSdkClientFactoryInterface;
-use CloudPlayDev\ConfluenceClient\Api\Content;
-use CloudPlayDev\ConfluenceClient\ConfluenceClient as SdkClient;
-use CloudPlayDev\ConfluenceClient\Entity\ContentAttachment;
-use CloudPlayDev\ConfluenceClient\Entity\ContentBody;
-use CloudPlayDev\ConfluenceClient\Entity\ContentPage;
-use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
-use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
-use Http\Client\Common\HttpMethodsClientInterface;
-use Http\Client\Exception;
-use Http\Client\Exception\TransferException;
+use App\Tests\Support\QueueClient;
+use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use VirtualLast\ConfluenceV2\Configuration;
+use VirtualLast\ConfluenceV2\ConfluenceClient as SdkClient;
 
 final class ConfluenceClientTest extends TestCase
 {
-    /**
-     * What: A requested page is converted from storage content to export-view HTML.
-     * How: SDK doubles return a page and rendered body while all conversion arguments are verified.
-     * Why: The adapter must supply Markdown conversion with rendered HTML rather than storage markup.
-     */
-    public function testItFetchesAndRendersAPage(): void
+    public function testItMapsAViewPageAndResolvesItsSpace(): void
     {
-        $page = (new ContentPage())
-            ->setId(123)
-            ->setTitle('Architecture')
-            ->setContent('<ac:structured-macro />');
+        $transport = new QueueClient(
+            $this->jsonResponse([
+                'id' => '123',
+                'title' => 'Architecture',
+                'spaceId' => '42',
+                'createdAt' => '2022-10-18T00:00:00.000Z',
+                'body' => [
+                    'view' => [
+                        'representation' => 'view',
+                        'value' => '<h1>Architecture</h1>',
+                    ],
+                ],
+                'version' => ['number' => 7],
+            ]),
+            $this->jsonResponse(['id' => '42', 'key' => 'ENG']),
+        );
 
-        $renderedBody = (new ContentBody())
-            ->setRepresentation(ContentBody::REPRESENTATION_EXPORT_VIEW)
-            ->setValue('<h1>Architecture</h1>');
+        $page = $this->createClient($transport)->getPage('123');
 
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->expects(self::once())
-            ->method('find')
-            ->with(['id' => '123'], 1)
-            ->willReturn((new ContentSearchResult())->setResults([$page]));
-        $contentApi
-            ->expects(self::once())
-            ->method('convert')
-            ->with(
-                self::callback(static function (ContentBody $body): bool {
-                    return $body->getRepresentation() === ContentBody::REPRESENTATION_STORAGE
-                        && $body->getValue() === '<ac:structured-macro />';
-                }),
-                ContentBody::REPRESENTATION_EXPORT_VIEW,
-                $page,
-            )
-            ->willReturn($renderedBody);
-
-        $client = $this->createClient($contentApi);
-
-        $result = $client->getPage('123');
-
-        self::assertSame($page, $result);
-        self::assertSame('<h1>Architecture</h1>', $result->getContent());
+        self::assertSame('123', $page->id);
+        self::assertSame('Architecture', $page->title);
+        self::assertSame('<h1>Architecture</h1>', $page->html);
+        self::assertSame('42', $page->spaceId);
+        self::assertSame('ENG', $page->spaceKey);
+        self::assertSame(7, $page->version);
+        $pageUri = $transport->requests[0]->getUri();
+        self::assertSame('/wiki/api/v2/pages/123', $pageUri->getPath());
+        parse_str($pageUri->getQuery(), $pageQuery);
+        self::assertSame('view', $pageQuery['body-format'] ?? null);
+        self::assertSame('/wiki/api/v2/spaces/42', $transport->requests[1]->getUri()->getPath());
     }
 
-    /**
-     * What: Null source content is converted as an empty storage body.
-     * How: A page without content is returned and the conversion body is inspected.
-     * Why: Incomplete Confluence responses must not cause a string type error.
-     */
-    public function testItHandlesNullPageContent(): void
+    public function testItCachesSpaceKeysForTheClientLifetime(): void
     {
-        $page = (new ContentPage())->setId(123)->setTitle('Empty');
-        $renderedBody = (new ContentBody())->setValue('');
+        $transport = new QueueClient(
+            $this->pageResponse('1', '42'),
+            $this->jsonResponse(['id' => '42', 'key' => 'ENG']),
+            $this->pageResponse('2', '42'),
+        );
+        $client = $this->createClient($transport);
 
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->method('find')
-            ->willReturn((new ContentSearchResult())->setResults([$page]));
-        $contentApi
-            ->expects(self::once())
-            ->method('convert')
-            ->with(
-                self::callback(
-                    static fn(ContentBody $body): bool => $body->getValue() === '',
-                ),
-                ContentBody::REPRESENTATION_EXPORT_VIEW,
-                $page,
-            )
-            ->willReturn($renderedBody);
+        $client->getPage('1');
+        $client->getPage('2');
 
-        $result = $this->createClient($contentApi)->getPage('123');
-
-        self::assertSame('', $result->getContent());
+        self::assertCount(3, $transport->requests);
+        self::assertSame(1, count(array_filter(
+            $transport->requests,
+            static fn($request): bool => str_contains((string) $request->getUri(), '/spaces/42'),
+        )));
     }
 
-    public function testItLooksUpPageIdsBeyondThePhpIntegerRangeAsStrings(): void
+    public function testItRejectsAPageWithoutAViewBody(): void
     {
-        $pageId = '999999999999999999999999';
-        $page = (new ContentPage())->setId($pageId)->setTitle('Large ID')->setContent('Storage');
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->expects(self::once())
-            ->method('find')
-            ->with(['id' => $pageId], 1)
-            ->willReturn((new ContentSearchResult())->setResults([$page]));
-        $contentApi
-            ->expects(self::once())
-            ->method('convert')
-            ->willReturn((new ContentBody())->setValue('Rendered'));
+        $transport = new QueueClient($this->jsonResponse([
+            'id' => '123',
+            'title' => 'Broken',
+            'spaceId' => '42',
+            'body' => [],
+            'version' => ['number' => 1],
+        ]));
 
-        $result = $this->createClient($contentApi)->getPage($pageId);
+        $this->expectException(ConfluenceRequestException::class);
+        $this->expectExceptionMessage('did not contain a view body');
 
-        self::assertSame($pageId, $result->getId());
-        self::assertSame('Rendered', $result->getContent());
+        $this->createClient($transport)->getPage('123');
     }
 
-    /**
-     * What: A missing SDK page produces a clear adapter exception.
-     * How: The SDK returns null for a page lookup and the resulting message is asserted.
-     * Why: Callers need a domain-relevant failure instead of a null dereference.
-     */
-    public function testItReportsAMissingPage(): void
+    public function testItRejectsAnIdOutsideTheSupportedIntegerRange(): void
     {
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->expects(self::once())
-            ->method('find')
-            ->with(['id' => '404'], 1)
-            ->willReturn(new ContentSearchResult());
+        $this->expectException(ConfluenceRequestException::class);
+        $this->expectExceptionMessage('positive integer within the supported range');
 
-        $this->expectException(ConfluencePhpClientException::class);
-        $this->expectExceptionMessage('Confluence page 404 was not found.');
-
-        $this->createClient($contentApi)->getPage('404');
-    }
-
-    /**
-     * What: HTTP client failures are translated while retaining their original cause.
-     * How: The SDK throws a transfer exception and the adapter exception chain is inspected.
-     * Why: Application callers need one exception type without losing diagnostic context.
-     */
-    public function testItTranslatesHttpClientFailures(): void
-    {
-        $httpException = new TransferException('Network unavailable.');
-        $contentApi = $this->createMock(Content::class);
-        $contentApi
-            ->expects(self::once())
-            ->method('find')
-            ->willThrowException($httpException);
-
-        try {
-            $this->createClient($contentApi)->getPage('123');
-            self::fail('Expected the adapter to translate the HTTP exception.');
-        } catch (ConfluencePhpClientException $exception) {
-            self::assertSame('Network unavailable.', $exception->getMessage());
-            self::assertSame($httpException, $exception->getPrevious());
-        }
+        $this->createClient(new QueueClient())->getPage('999999999999999999999999');
     }
 
     public function testItFetchesEveryPageOfChildReferencesInApiOrder(): void
     {
-        $requestedUris = [];
-        $responses = [
-            new Response(200, [], json_encode([
+        $transport = new QueueClient(
+            $this->jsonResponse([
                 'results' => [
-                    ['id' => '999999999999999999999', 'type' => 'page', 'title' => 'First'],
-                    ['id' => '2', 'type' => 'page', 'title' => 'Second'],
+                    ['id' => '2', 'title' => 'Second', 'spaceId' => '42'],
+                    ['id' => '3', 'title' => 'Third', 'spaceId' => '42'],
                 ],
-                '_links' => ['next' => '/rest/api/content/1/child/page?start=2'],
-            ], JSON_THROW_ON_ERROR)),
-            new Response(200, [], json_encode([
+                '_links' => ['next' => '/wiki/api/v2/pages/1/children?cursor=next'],
+            ]),
+            $this->jsonResponse([
                 'results' => [
-                    ['id' => '3', 'type' => 'page', 'title' => 'Third'],
+                    ['id' => '4', 'title' => 'Fourth', 'spaceId' => '42'],
                 ],
                 '_links' => [],
-            ], JSON_THROW_ON_ERROR)),
-        ];
-        $httpClient = $this->createMock(HttpMethodsClientInterface::class);
-        $httpClient
-            ->expects(self::exactly(2))
-            ->method('get')
-            ->willReturnCallback(static function (string $uri) use (&$requestedUris, &$responses): Response {
-                $requestedUris[] = $uri;
-                $response = array_shift($responses);
-
-                if ($response === null) {
-                    throw new \LogicException('No child-page response was configured.');
-                }
-
-                return $response;
-            });
-
-        $children = $this->createClientWithHttpClient($httpClient)->getChildPages('1');
-
-        self::assertSame(
-            [
-                '/rest/api/content/1/child/page?start=0&limit=100',
-                '/rest/api/content/1/child/page?start=2&limit=100',
-            ],
-            $requestedUris,
+            ]),
         );
-        self::assertSame(
-            ['999999999999999999999', '2', '3'],
-            array_map(static fn($child): string => $child->id, $children),
-        );
-        self::assertSame(['First', 'Second', 'Third'], array_map(static fn($child): ?string => $child->title, $children));
+
+        $children = $this->createClient($transport)->getChildPages('1');
+
+        self::assertSame(['2', '3', '4'], array_column($children, 'id'));
+        self::assertSame(['Second', 'Third', 'Fourth'], array_column($children, 'title'));
+        self::assertStringContainsString('cursor=next', (string) $transport->requests[1]->getUri());
     }
 
     public function testItRejectsAnInvalidChildPageId(): void
     {
-        $httpClient = $this->createStub(HttpMethodsClientInterface::class);
-        $httpClient->method('get')->willReturn(new Response(200, [], json_encode([
-            'results' => [['id' => 'invalid', 'type' => 'page', 'title' => 'Broken']],
-        ], JSON_THROW_ON_ERROR)));
+        $transport = new QueueClient($this->jsonResponse([
+            'results' => [['id' => 'invalid', 'title' => 'Broken', 'spaceId' => '42']],
+            '_links' => [],
+        ]));
 
-        $this->expectException(ConfluencePhpClientException::class);
-        $this->expectExceptionMessage('invalid child page ID');
+        $this->expectException(ConfluenceRequestException::class);
+        $this->expectExceptionMessage('invalid child page');
 
-        $this->createClientWithHttpClient($httpClient)->getChildPages('1');
+        $this->createClient($transport)->getChildPages('1');
     }
 
-    /**
-     * What: Confluence attachments are downloaded from the Confluence API.
-     * How: The Confluence API is queried for the attachment contents.
-     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
-     * @throws Exception
-     * @throws ConfluencePhpClientException
-     */
-    public function testItDownloadsRawAttachmentContents(): void
+    public function testItPaginatesAndDownloadsAttachmentsIntoLocalModels(): void
     {
-        // arrange
-        $contents = "\xFF\xD8\xFFexample-jpeg-data";
-        $attachment = new ContentAttachment()
-            ->setDownloadUrl('/download/attachments/123/photo.jpg');
-        $httpClient = $this->createMock(HttpMethodsClientInterface::class);
-        $httpClient
-            ->expects(self::once())
-            ->method('get')
-            ->with('/download/attachments/123/photo.jpg')
-            ->willReturn(new Response(200, [], $contents));
-
-        // act
-        $result = $this->createClientWithHttpClient($httpClient)
-            ->downloadAttachment($attachment);
-
-        // assert
-        self::assertSame($contents, $result);
-    }
-
-    /**
-     * What: Confluence attachments are downloaded from the Confluence API.
-     * How: The Confluence API is queried for the attachment contents.
-     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
-     * @throws Exception
-     */
-    public function testItReportsAMissingAttachmentDownloadUrl(): void
-    {
-        // assert
-        $this->expectException(ConfluencePhpClientException::class);
-        $this->expectExceptionMessageIsOrContains('does not contain a download URL');
-
-        // act
-        $this->createClient($this->createStub(Content::class))
-            ->downloadAttachment(new ContentAttachment());
-    }
-
-    /**
-     * What: Confluence attachments are downloaded from the Confluence API.
-     * How: The Confluence API is queried for the attachment contents.
-     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
-     * @throws Exception
-     */
-    public function testItReportsAnUnsuccessfulAttachmentDownload(): void
-    {
-        // arrange
-        $attachment = new ContentAttachment()->setDownloadUrl('/missing.jpg');
-        $httpClient = $this->createStub(HttpMethodsClientInterface::class);
-        $httpClient->method('get')->willReturn(new Response(404));
-
-        // assert
-        $this->expectException(ConfluencePhpClientException::class);
-        $this->expectExceptionCode(404);
-        $this->expectExceptionMessageIsOrContains('The endpoint you have tried to access does not exist.');
-
-        // act
-        $this->createClientWithHttpClient($httpClient)
-            ->downloadAttachment($attachment);
-    }
-
-    private function createClient(Content $contentApi): ConfluenceClient
-    {
-        $sdkClient = $this->createStub(SdkClient::class);
-        $sdkClient->method('content')->willReturn($contentApi);
-
-        $factory = $this->createStub(
-            ConfluenceSdkClientFactoryInterface::class,
+        $transport = new QueueClient(
+            $this->attachmentPage('att1', 'first.txt', '/wiki/download/first.txt', 'next'),
+            $this->attachmentMetadata('att1', 'first.txt', '/wiki/download/first.txt', 5),
+            new Response(200, [], 'first'),
+            $this->attachmentPage('att2', 'second.bin', '/wiki/download/second.bin'),
+            $this->attachmentMetadata('att2', 'second.bin', '/wiki/download/second.bin', 6),
+            new Response(200, [], 'second'),
         );
-        $factory->method('create')->willReturn($sdkClient);
 
-        return new ConfluenceClient($factory);
+        $attachments = $this->createClient($transport)->getPageAttachments('1');
+
+        self::assertCount(2, $attachments);
+        self::assertSame(['att1', 'att2'], array_column($attachments, 'id'));
+        self::assertSame(['first', 'second'], array_column($attachments, 'content'));
+        self::assertSame(['/wiki/download/first.txt', '/wiki/download/second.bin'], array_column($attachments, 'downloadUrl'));
+        self::assertSame([5, 6], array_column($attachments, 'size'));
+        self::assertStringContainsString('cursor=next', (string) $transport->requests[3]->getUri());
     }
 
-    private function createClientWithHttpClient(
-        HttpMethodsClientInterface $httpClient,
-    ): ConfluenceClient {
-        $sdkClient = $this->createStub(SdkClient::class);
-        $sdkClient->method('getHttpClient')->willReturn($httpClient);
+    public function testItTranslatesApiFailuresToTheLocalException(): void
+    {
+        $transport = new QueueClient($this->jsonResponse(['message' => 'Missing page'], 404));
 
-        $factory = $this->createStub(ConfluenceSdkClientFactoryInterface::class);
-        $factory->method('create')->willReturn($sdkClient);
+        try {
+            $this->createClient($transport)->getPage('404');
+            self::fail('Expected a local Confluence exception.');
+        } catch (ConfluenceRequestException $exception) {
+            self::assertSame(404, $exception->getCode());
+            self::assertSame('Confluence returned HTTP 404: Missing page', $exception->getMessage());
+            self::assertNotNull($exception->getPrevious());
+        }
+    }
 
-        return new ConfluenceClient($factory);
+    public function testItTranslatesTransportFailuresToTheLocalException(): void
+    {
+        $transport = new class implements ClientInterface {
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                throw new class ('Network unavailable') extends \RuntimeException implements ClientExceptionInterface {};
+            }
+        };
+
+        try {
+            $this->createClient($transport)->getPage('123');
+            self::fail('Expected a local Confluence exception.');
+        } catch (ConfluenceRequestException $exception) {
+            self::assertSame('The Confluence request could not be completed.', $exception->getMessage());
+            self::assertNotNull($exception->getPrevious());
+        }
+    }
+
+    private function createClient(ClientInterface $transport): ConfluenceClient
+    {
+        $factory = new Psr17Factory();
+        $sdkClient = SdkClient::create(
+            new Configuration('https://example.atlassian.net', 'user@example.com', 'token'),
+            $transport,
+            $factory,
+            $factory,
+        );
+
+        return new ConfluenceClient(new class ($sdkClient) implements ConfluenceSdkClientFactoryInterface {
+            public function __construct(private readonly SdkClient $client) {}
+
+            public function create(): SdkClient
+            {
+                return $this->client;
+            }
+        });
+    }
+
+    private function pageResponse(string $id, string $spaceId): Response
+    {
+        return $this->jsonResponse([
+            'id' => $id,
+            'title' => 'Page ' . $id,
+            'spaceId' => $spaceId,
+            'body' => [
+                'view' => [
+                    'representation' => 'view',
+                    'value' => '<p>Page</p>',
+                ],
+            ],
+            'version' => ['number' => 1],
+        ]);
+    }
+
+    private function attachmentPage(
+        string $id,
+        string $title,
+        string $downloadLink,
+        ?string $cursor = null,
+    ): Response {
+        return $this->jsonResponse([
+            'results' => [[
+                'id' => $id,
+                'title' => $title,
+                'downloadLink' => $downloadLink,
+            ]],
+            '_links' => $cursor === null
+                ? []
+                : ['next' => '/wiki/api/v2/pages/1/attachments?cursor=' . $cursor],
+        ]);
+    }
+
+    private function attachmentMetadata(
+        string $id,
+        string $title,
+        string $downloadLink,
+        int $size,
+    ): Response {
+        return $this->jsonResponse([
+            'id' => $id,
+            'title' => $title,
+            'downloadLink' => $downloadLink,
+            'mediaType' => 'application/octet-stream',
+            'fileSize' => $size,
+        ]);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function jsonResponse(array $body, int $status = 200): Response
+    {
+        return new Response(
+            $status,
+            ['Content-Type' => 'application/json'],
+            json_encode($body, JSON_THROW_ON_ERROR),
+        );
     }
 }

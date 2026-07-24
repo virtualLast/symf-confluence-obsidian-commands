@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Confluence\Traversal;
 
-use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceGatewayInterface;
 use App\Confluence\ConfluencePageImportPipelineInterface;
 use SplQueue;
 
@@ -12,7 +12,7 @@ final readonly class ConfluenceImportTraversal
 {
     public function __construct(
         private ConfluencePageImportPipelineInterface $importPipeline,
-        private ConfluenceClient $confluenceClient,
+        private ConfluenceGatewayInterface $confluenceGateway,
     ) {}
 
     public function traverse(
@@ -67,7 +67,7 @@ final readonly class ConfluenceImportTraversal
 
             if ($options->followChildren) {
                 try {
-                    $children = $this->confluenceClient->getChildPages($completedImport->page->id);
+                    $children = $this->confluenceGateway->getChildPages($completedImport->page->id);
                     $childPagesFound += count($children);
 
                     foreach ($children as $child) {

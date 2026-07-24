@@ -17,6 +17,7 @@ final readonly class ObsidianFrontmatterRenderer
             'confluence' => [
                 'pageId' => $page->id,
                 'title' => $page->title,
+                'spaceId' => $page->spaceId,
                 'spaceKey' => $page->spaceKey,
                 'version' => $page->version,
             ],

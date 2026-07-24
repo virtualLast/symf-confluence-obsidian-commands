@@ -18,6 +18,7 @@ final class ObsidianFrontmatterRendererTest extends TestCase
             id: '664600597',
             title: 'SSO Overview',
             content: '# SSO Overview',
+            spaceId: '1234',
             spaceKey: 'SD',
             version: 17,
             linkedPages: [
@@ -36,6 +37,7 @@ final class ObsidianFrontmatterRendererTest extends TestCase
         self::assertSame('confluence', $metadata['source']);
         self::assertSame('664600597', $metadata['confluence']['pageId']);
         self::assertSame('SSO Overview', $metadata['confluence']['title']);
+        self::assertSame('1234', $metadata['confluence']['spaceId']);
         self::assertSame('SD', $metadata['confluence']['spaceKey']);
         self::assertSame(17, $metadata['confluence']['version']);
         self::assertSame(

@@ -22,6 +22,9 @@ services:
     App\Confluence\ConfluenceSdkClientFactoryInterface:
         alias: App\Confluence\ConfluenceSdkClientFactory
 
+    App\Confluence\ConfluenceGatewayInterface:
+        alias: App\Confluence\ConfluenceClient
+
     App\Confluence\ConfluencePageImportPipelineInterface:
         alias: App\Confluence\ConfluencePageImportPipeline
 

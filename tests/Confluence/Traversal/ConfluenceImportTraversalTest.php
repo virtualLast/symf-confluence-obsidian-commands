@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Confluence\Traversal;
 
 use App\Confluence\CompletedConfluencePageImport;
-use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceGatewayInterface;
 use App\Confluence\ConfluencePageImportPipelineInterface;
 use App\Confluence\Traversal\ConfluenceImportTraversal;
 use App\Confluence\Traversal\ConfluenceTraversalOptions;
@@ -63,7 +63,7 @@ final class ConfluenceImportTraversalTest extends TestCase
             ->method('import')
             ->with('root', '', false)
             ->willReturn($this->completed($this->page('root', [new ImportedLinkedPage('linked', 'Linked', 'url')])));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client->expects(self::never())->method('getChildPages');
 
         $result = new ConfluenceImportTraversal($pipeline, $client)->traverse(
@@ -124,7 +124,7 @@ final class ConfluenceImportTraversalTest extends TestCase
     {
         $pipeline = $this->createStub(ConfluencePageImportPipelineInterface::class);
         $pipeline->method('import')->willThrowException(new RuntimeException('Root unavailable.'));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client->expects(self::never())->method('getChildPages');
 
         $result = new ConfluenceImportTraversal($pipeline, $client)->traverse(
@@ -148,7 +148,7 @@ final class ConfluenceImportTraversalTest extends TestCase
                     ? $this->page('1', [new ImportedLinkedPage('2', 'Linked', 'url')])
                     : $this->page('2'),
             ));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client
             ->expects(self::exactly(2))
             ->method('getChildPages')
@@ -197,7 +197,7 @@ final class ConfluenceImportTraversalTest extends TestCase
 
                 return $this->completed($pages[$pageId]);
             });
-        $client = $this->createStub(ConfluenceClient::class);
+        $client = $this->createStub(ConfluenceGatewayInterface::class);
         $client
             ->method('getChildPages')
             ->willReturnCallback(static fn(string $pageId): array => $children[$pageId] ?? []);

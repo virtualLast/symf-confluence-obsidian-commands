@@ -7,8 +7,6 @@ namespace App\Confluence;
 use App\Obsidian\ObsidianAttachmentPlaceholderRewriter;
 use App\Obsidian\ObsidianAttachmentWriter;
 use App\Obsidian\ObsidianPageWriter;
-use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
-use Http\Client\Exception;
 use InvalidArgumentException;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 
@@ -21,11 +19,6 @@ final readonly class ConfluencePageImportPipeline implements ConfluencePageImpor
         private ObsidianAttachmentPlaceholderRewriter $attachmentPlaceholderRewriter,
     ) {}
 
-    /**
-     * @throws Exception
-     * @throws ConfluencePhpClientException
-     * @throws \JsonException
-     */
     public function import(
         string $pageId,
         string $destination = '',

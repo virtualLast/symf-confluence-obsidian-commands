@@ -15,6 +15,7 @@ final readonly class ImportedPage
         public string $title,
         public string $content,
         public array $attachments = [],
+        public string $spaceId = '',
         public string $spaceKey = '',
         public int $version = 1,
         public array $linkedPages = [],

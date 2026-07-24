@@ -22,13 +22,13 @@ composer install
 Create a `.env.local` file so credentials and machine-specific paths remain outside version control:
 
 ```dotenv
-CONFLUENCE_BASE_URL="https://example.atlassian.net/wiki/"
+CONFLUENCE_BASE_URL="https://example.atlassian.net"
 CONFLUENCE_EMAIL="you@example.com"
 CONFLUENCE_API_TOKEN="your-api-token"
 OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian/Vault"
 ```
 
-`CONFLUENCE_BASE_URL` should include the `/wiki/` path for Confluence Cloud.
+`CONFLUENCE_BASE_URL` must be the HTTPS Confluence site root and must not include `/wiki/`.
 
 ## Usage
 

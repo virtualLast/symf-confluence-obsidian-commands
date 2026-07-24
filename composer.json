@@ -8,7 +8,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:virtualLast/confluence-php-client.git"
+            "url": "https://github.com/virtualLast/confluence-v2-php-client.git"
         }
     ],
     "require": {
@@ -17,7 +17,6 @@
         "ext-dom": "*",
         "ext-iconv": "*",
         "ext-libxml": "*",
-        "cloudplaydev/confluence-php-client": "dev-feature/attachment-download-url",
         "league/html-to-markdown": "^5.1",
         "nyholm/psr7": "^1.8",
         "symfony/console": "8.1.*",
@@ -29,7 +28,8 @@
         "symfony/runtime": "8.1.*",
         "symfony/string": "8.1.*",
         "symfony/translation-contracts": "^3.7",
-        "symfony/yaml": "8.1.*"
+        "symfony/yaml": "8.1.*",
+        "virtuallast/confluence-v2-php-client": "^0.2.3"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.80",

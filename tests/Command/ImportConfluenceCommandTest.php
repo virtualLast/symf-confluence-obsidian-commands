@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ImportConfluenceCommand;
-use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceGatewayInterface;
 use App\Confluence\ConfluenceImporter;
 use App\Confluence\ConfluencePageImportPipeline;
 use App\Confluence\Traversal\ConfluenceImportTraversal;
@@ -498,6 +498,7 @@ final class ImportConfluenceCommandTest extends TestCase
         yield 'negative' => ['-1'];
         yield 'surrounding whitespace' => [' 123 '];
         yield 'decimal' => ['1.5'];
+        yield 'outside integer range' => ['999999999999999999999999'];
     }
 
     /** @param array<string, mixed> $input */
@@ -534,10 +535,10 @@ final class ImportConfluenceCommandTest extends TestCase
             ->method('importPage')
             ->with('123', false)
             ->willReturn(new ImportedPage('123', 'Root', 'Content'));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client->expects(self::never())->method('getChildPages');
 
-        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $tester = $this->createCommandTester($importer, confluenceGateway: $client);
         $exitCode = $tester->execute([
             'page' => '123',
             '--recursive' => true,
@@ -562,14 +563,14 @@ final class ImportConfluenceCommandTest extends TestCase
                 'Content',
                 attachments: $withAttachments ? [new ImportedAttachment('att', $pageId . '.txt', 'file')] : [],
             ));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client
             ->expects(self::once())
             ->method('getChildPages')
             ->with('1')
             ->willReturn([new ConfluencePageReference('2', 'Child')]);
 
-        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $tester = $this->createCommandTester($importer, confluenceGateway: $client);
         $exitCode = $tester->execute([
             'page' => '1',
             'destination' => 'Inbox/Confluence',
@@ -598,10 +599,10 @@ final class ImportConfluenceCommandTest extends TestCase
                     new ImportedLinkedPage('2', 'Linked', 'https://example.atlassian.net/wiki/pages/2'),
                 ])
                 : new ImportedPage('2', 'Linked', 'Content'));
-        $client = $this->createMock(ConfluenceClient::class);
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
         $client->expects(self::never())->method('getChildPages');
 
-        $tester = $this->createCommandTester($importer, confluenceClient: $client);
+        $tester = $this->createCommandTester($importer, confluenceGateway: $client);
         $exitCode = $tester->execute([
             'page' => '1',
             '--follow-links' => true,
@@ -650,7 +651,7 @@ final class ImportConfluenceCommandTest extends TestCase
     private function createCommandTester(
         ConfluenceImporter $confluenceImporter,
         ?ObsidianImageLinkBuilderInterface $obsidianImageLinkBuilder = null,
-        ?ConfluenceClient $confluenceClient = null,
+        ?ConfluenceGatewayInterface $confluenceGateway = null,
     ): CommandTester {
         $pathBuilder = new ObsidianPathBuilder(new AsciiSlugger());
         $obsidianWriter = new ObsidianPageWriter(
@@ -678,7 +679,7 @@ final class ImportConfluenceCommandTest extends TestCase
             importPipeline: $pipeline,
             importTraversal: new ConfluenceImportTraversal(
                 $pipeline,
-                $confluenceClient ?? $this->createStub(ConfluenceClient::class),
+                $confluenceGateway ?? $this->createStub(ConfluenceGatewayInterface::class),
             ),
         );
 

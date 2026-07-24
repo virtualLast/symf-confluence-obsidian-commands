@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Confluence;
 
-use CloudPlayDev\ConfluenceClient\ConfluenceClient;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use VirtualLast\ConfluenceV2\Configuration;
+use VirtualLast\ConfluenceV2\ConfluenceClient;
 
 final readonly class ConfluenceSdkClientFactory implements ConfluenceSdkClientFactoryInterface
 {
@@ -20,10 +21,10 @@ final readonly class ConfluenceSdkClientFactory implements ConfluenceSdkClientFa
 
     public function create(): ConfluenceClient
     {
-        return new ConfluenceClient($this->confluenceBaseUrl)
-            ->authenticateBasicAuth(
-                $this->confluenceEmail,
-                $this->privateAccessToken,
-            );
+        return ConfluenceClient::create(new Configuration(
+            $this->confluenceBaseUrl,
+            $this->confluenceEmail,
+            $this->privateAccessToken,
+        ));
     }
 }

@@ -9,7 +9,7 @@ use App\Confluence\Traversal\ConfluenceImportTraversal;
 use App\Confluence\Traversal\ConfluenceTraversalOptions;
 use App\Confluence\Traversal\ConfluenceTraversalResult;
 use App\Confluence\Traversal\PageDiscoverySource;
-use Http\Client\Exception as HttpClientException;
+use App\Model\ConfluenceId;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -86,8 +86,8 @@ final class ImportConfluenceCommand extends Command
 
         $pageArgument = (string) $input->getArgument(self::PAGE_ARGUMENT);
 
-        if (preg_match('/^[1-9]\d*$/', $pageArgument) !== 1) {
-            $io->error('The Confluence page ID must be a positive integer.');
+        if (!ConfluenceId::isValid($pageArgument)) {
+            $io->error('The Confluence page ID must be a positive integer within the supported range.');
 
             return Command::INVALID;
         }
@@ -158,7 +158,7 @@ final class ImportConfluenceCommand extends Command
                 $destination,
                 $withAttachments,
             );
-        } catch (\Exception|HttpClientException $exception) {
+        } catch (\Exception $exception) {
             $io->error($exception->getMessage());
 
             return Command::FAILURE;
@@ -189,7 +189,7 @@ final class ImportConfluenceCommand extends Command
                 $destination,
                 $withAttachments,
             );
-        } catch (\Exception|HttpClientException $exception) {
+        } catch (\Exception $exception) {
             $io->error($exception->getMessage());
 
             return Command::FAILURE;

@@ -4,156 +4,101 @@ declare(strict_types=1);
 
 namespace App\Tests\Confluence;
 
-use App\Confluence\ConfluenceClient;
 use App\Confluence\ConfluenceContentConverter;
+use App\Confluence\ConfluenceGatewayInterface;
 use App\Confluence\ConfluenceImporter;
 use App\Confluence\ConfluenceLinkedPageExtractor;
+use App\Model\ConfluenceAttachment;
+use App\Model\ConfluencePage;
 use App\Model\ImportedAttachment;
-use App\Model\ImportedPage;
-use CloudPlayDev\ConfluenceClient\Entity\AbstractContent;
-use CloudPlayDev\ConfluenceClient\Entity\ContentAttachment;
-use CloudPlayDev\ConfluenceClient\Entity\ContentSearchResult;
-use CloudPlayDev\ConfluenceClient\Exception\ConfluencePhpClientException;
-use Http\Client\Exception;
 use PHPUnit\Framework\TestCase;
 
-class ConfluenceImporterTest extends TestCase
+final class ConfluenceImporterTest extends TestCase
 {
-    /**
-     * What: Importing one page fetches that page, not its children, and maps its fields.
-     * How: Client and page doubles define the response, calls, and expected ImportedPage values.
-     * Why: A single-page import must remain scoped and faithfully transfer the source data.
-     */
-    public function testImportPageFetchesPageFromConfluence(): void
+    public function testItMapsOnlyLocalConfluenceModelsIntoAnImportedPage(): void
     {
-        // arrange
-        $converter = $this->createConfluenceContentConverter();
-        $pageId = '664600597';
-        $title = 'Test page';
-        $content = 'Test content';
-
-        $pageStub = $this->createStub(AbstractContent::class);
-        $pageStub
-            ->method('getId')
-            ->willReturn($pageId)
-        ;
-        $pageStub
-            ->method('getTitle')
-            ->willReturn($title)
-        ;
-        $pageStub
-            ->method('getContent')
-            ->willReturn($content)
-        ;
-        $pageStub->method('getSpace')->willReturn('SD');
-        $pageStub->method('getVersion')->willReturn(17);
-
-        $confluenceClientMock = $this->createMock(ConfluenceClient::class);
-        $confluenceClientMock
-            ->expects($this->once())
-            ->method('getPage')
-            ->with($pageId)
-            ->willReturn($pageStub)
-        ;
-
-        // act
-        $importer = new ConfluenceImporter(
-            $confluenceClientMock,
-            $converter,
-            new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
-        );
-        $importedPage = $importer->importPage($pageId);
-
-        // assert
-        $this->assertInstanceOf(ImportedPage::class, $importedPage);
-        $this->assertSame($pageId, $importedPage->id);
-        $this->assertSame($title, $importedPage->title);
-        $this->assertSame($content, $importedPage->content);
-        $this->assertSame('SD', $importedPage->spaceKey);
-        $this->assertSame(17, $importedPage->version);
-    }
-
-    /**
-     * What: Confluence HTML content is converted into the expected Markdown representation.
-     * How: The real conversion pipeline processes a heading and bold paragraph for exact comparison.
-     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
-     */
-    public function testConvertsHtmlContentToMarkdown(): void
-    {
-        // arrange
-        $converter = $this->createConfluenceContentConverter();
-        // act
-        $result = $converter->toMarkdown(
-            '<h2>Heading</h2><p>Hello <strong>world</strong></p>',
-        );
-        // assert
-        $this->assertSame(
-            "## Heading\n\nHello **world**",
-            trim($result),
-        );
-    }
-
-    /**
-     * What: Confluence attachments are converted into local models.
-     * How: The Confluence API is queried for the attachment contents, which are then converted into a local model.
-     * Why: Imported pages must be usable as Markdown rather than retaining Confluence HTML.
-     * @return void
-     * @throws ConfluencePhpClientException
-     * @throws Exception
-     * @throws \JsonException
-     * @throws \PHPUnit\Framework\MockObject\Exception
-     */
-    public function testItConvertsAttachmentsToLocalModels(): void
-    {
-        // arrange
-        $contents = "\xFF\xD8\xFFexample-jpeg-data";
-        $page = $this->createStub(AbstractContent::class);
-        $page->method('getId')->willReturn(123);
-        $page->method('getTitle')->willReturn('Page with attachment');
-        $page->method('getContent')->willReturn('Content');
-
-        $attachment = new ContentAttachment();
-        $attachment
-            ->setId('456')
-            ->setTitle('photo.jpg');
-        $attachment->setDownloadUrl('/download/attachments/123/photo.jpg');
-        $attachmentResult = new ContentSearchResult()
-            ->setResults([$attachment]);
-
-        $confluenceClient = $this->createMock(ConfluenceClient::class);
-        $confluenceClient
+        $gateway = $this->createMock(ConfluenceGatewayInterface::class);
+        $gateway
             ->expects(self::once())
             ->method('getPage')
-            ->with('123')
-            ->willReturn($page);
-        $confluenceClient
+            ->with('664600597')
+            ->willReturn(new ConfluencePage(
+                id: '664600597',
+                title: 'Test page',
+                html: '<p>Test content</p>',
+                spaceId: '1234',
+                spaceKey: 'SD',
+                version: 17,
+            ));
+        $gateway->expects(self::never())->method('getPageAttachments');
+
+        $importedPage = $this->importer($gateway)->importPage('664600597');
+
+        self::assertSame('664600597', $importedPage->id);
+        self::assertSame('Test page', $importedPage->title);
+        self::assertSame('Test content', $importedPage->content);
+        self::assertSame('1234', $importedPage->spaceId);
+        self::assertSame('SD', $importedPage->spaceKey);
+        self::assertSame(17, $importedPage->version);
+    }
+
+    public function testItConvertsAttachmentsToImportedAttachmentModels(): void
+    {
+        $contents = "\xFF\xD8\xFFexample-jpeg-data";
+        $gateway = $this->createMock(ConfluenceGatewayInterface::class);
+        $gateway
+            ->method('getPage')
+            ->willReturn(new ConfluencePage('123', 'Page', '<p>Content</p>', '42', 'SD', 1));
+        $gateway
             ->expects(self::once())
             ->method('getPageAttachments')
-            ->with($page)
-            ->willReturn($attachmentResult);
-        $confluenceClient
-            ->expects(self::once())
-            ->method('downloadAttachment')
-            ->with($attachment)
-            ->willReturn($contents);
+            ->with('123')
+            ->willReturn([
+                new ConfluenceAttachment(
+                    id: 'att456',
+                    filename: 'photo.jpg',
+                    content: $contents,
+                    mediaType: 'image/jpeg',
+                    size: strlen($contents),
+                    downloadUrl: '/wiki/download/photo.jpg',
+                ),
+            ]);
 
-        // act
-        $importedPage = new ConfluenceImporter(
-            $confluenceClient,
-            $this->createConfluenceContentConverter(),
-            new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
-        )->importPage('123', true);
+        $importedPage = $this->importer($gateway)->importPage('123', true);
 
-        // assert
         self::assertCount(1, $importedPage->attachments);
-        self::assertSame(
-            [ImportedAttachment::class],
-            array_map(get_debug_type(...), $importedPage->attachments),
-        );
-        self::assertNotContains($attachment, $importedPage->attachments);
-        self::assertSame('456', $importedPage->attachments[0]->id);
+        self::assertInstanceOf(ImportedAttachment::class, $importedPage->attachments[0]);
+        self::assertSame('att456', $importedPage->attachments[0]->id);
         self::assertSame('photo.jpg', $importedPage->attachments[0]->filename);
         self::assertSame($contents, $importedPage->attachments[0]->content);
+        self::assertSame('/wiki/download/photo.jpg', $importedPage->attachments[0]->downloadUrl);
+    }
+
+    public function testItExtractsLinkedPagesFromTheLocalPageHtml(): void
+    {
+        $gateway = $this->createStub(ConfluenceGatewayInterface::class);
+        $gateway->method('getPage')->willReturn(new ConfluencePage(
+            '123',
+            'Page',
+            '<a href="https://example.atlassian.net/wiki/pages/viewpage.action?pageId=456">Target</a>',
+            '42',
+            'SD',
+            1,
+        ));
+
+        $page = $this->importer($gateway)->importPage('123');
+
+        self::assertCount(1, $page->linkedPages);
+        self::assertSame('456', $page->linkedPages[0]->id);
+    }
+
+    private function importer(ConfluenceGatewayInterface $gateway): ConfluenceImporter
+    {
+        return new ConfluenceImporter(
+            $gateway,
+            $this->createConfluenceContentConverter(),
+            new ConfluenceLinkedPageExtractor('https://example.atlassian.net/wiki/'),
+        );
     }
 
     private function createConfluenceContentConverter(): ConfluenceContentConverter
