@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Confluence;
 
 use App\Confluence\ConfluenceClient;
+use App\Confluence\ConfluenceFolderMetadata;
+use App\Confluence\ConfluenceFolderMetadataClientInterface;
 use App\Confluence\ConfluenceRequestException;
 use App\Confluence\ConfluenceSdkClientFactoryInterface;
 use App\Tests\Support\QueueClient;
@@ -135,6 +137,123 @@ final class ConfluenceClientTest extends TestCase
         $this->createClient($transport)->getChildPages('1');
     }
 
+    public function testItFetchesFolderMetadataAndEveryPageOfSupportedDirectChildren(): void
+    {
+        $transport = new QueueClient(
+            $this->jsonResponse([
+                'results' => [
+                    [
+                        'id' => '11',
+                        'status' => 'current',
+                        'title' => 'Authentication',
+                        'type' => 'folder',
+                        'spaceId' => '42',
+                    ],
+                    [
+                        'id' => '12',
+                        'status' => 'current',
+                        'title' => 'Overview',
+                        'type' => 'page',
+                        'spaceId' => '42',
+                    ],
+                    [
+                        'id' => '13',
+                        'status' => 'current',
+                        'title' => 'Diagram',
+                        'type' => 'whiteboard',
+                        'spaceId' => '42',
+                    ],
+                ],
+                '_links' => ['next' => '/wiki/api/v2/folders/10/direct-children?cursor=next'],
+            ]),
+            $this->jsonResponse([
+                'results' => [[
+                    'id' => '14',
+                    'status' => 'current',
+                    'title' => 'SSO',
+                    'type' => 'folder',
+                    'spaceId' => '42',
+                ]],
+                '_links' => [],
+            ]),
+        );
+
+        $folder = $this->createClient($transport, 'Engineering')->getFolder('10');
+
+        self::assertSame('10', $folder->id);
+        self::assertSame('Engineering', $folder->title);
+        self::assertSame(['11', '12', '14'], array_column($folder->items, 'id'));
+        self::assertSame(['folder', 'page', 'folder'], array_map(
+            static fn($item): string => $item->type->value,
+            $folder->items,
+        ));
+        self::assertSame('/wiki/api/v2/folders/10/direct-children', $transport->requests[0]->getUri()->getPath());
+        self::assertStringContainsString('cursor=next', (string) $transport->requests[1]->getUri());
+    }
+
+    public function testItRejectsAnInvalidFolderItemId(): void
+    {
+        $transport = new QueueClient(
+            $this->jsonResponse([
+                'results' => [[
+                    'id' => 'invalid',
+                    'status' => 'current',
+                    'title' => 'Broken',
+                    'type' => 'page',
+                    'spaceId' => '42',
+                ]],
+                '_links' => [],
+            ]),
+        );
+
+        $this->expectException(ConfluenceRequestException::class);
+        $this->expectExceptionMessage('invalid direct child ID');
+
+        $this->createClient($transport, 'Engineering')->getFolder('10');
+    }
+
+    public function testItFetchesMixedPageDirectChildrenInApiOrder(): void
+    {
+        $transport = new QueueClient($this->jsonResponse([
+            'results' => [
+                [
+                    'id' => '11',
+                    'status' => 'current',
+                    'title' => 'Child page',
+                    'type' => 'page',
+                    'spaceId' => '42',
+                ],
+                [
+                    'id' => '12',
+                    'status' => 'current',
+                    'title' => 'Child folder',
+                    'type' => 'folder',
+                    'spaceId' => '42',
+                ],
+                [
+                    'id' => '13',
+                    'status' => 'current',
+                    'title' => 'Unsupported database',
+                    'type' => 'database',
+                    'spaceId' => '42',
+                ],
+            ],
+            '_links' => [],
+        ]));
+
+        $items = $this->createClient($transport)->getPageDirectChildren('10');
+
+        self::assertSame(['11', '12'], array_column($items, 'id'));
+        self::assertSame(['page', 'folder'], array_map(
+            static fn($item): string => $item->type->value,
+            $items,
+        ));
+        self::assertSame(
+            '/wiki/api/v2/pages/10/direct-children',
+            $transport->requests[0]->getUri()->getPath(),
+        );
+    }
+
     public function testItPaginatesAndDownloadsAttachmentsIntoLocalModels(): void
     {
         $transport = new QueueClient(
@@ -188,8 +307,10 @@ final class ConfluenceClientTest extends TestCase
         }
     }
 
-    private function createClient(ClientInterface $transport): ConfluenceClient
-    {
+    private function createClient(
+        ClientInterface $transport,
+        string $folderTitle = 'Folder',
+    ): ConfluenceClient {
         $factory = new Psr17Factory();
         $sdkClient = SdkClient::create(
             new Configuration('https://example.atlassian.net', 'user@example.com', 'token'),
@@ -198,14 +319,24 @@ final class ConfluenceClientTest extends TestCase
             $factory,
         );
 
-        return new ConfluenceClient(new class ($sdkClient) implements ConfluenceSdkClientFactoryInterface {
+        $sdkFactory = new class ($sdkClient) implements ConfluenceSdkClientFactoryInterface {
             public function __construct(private readonly SdkClient $client) {}
 
             public function create(): SdkClient
             {
                 return $this->client;
             }
-        });
+        };
+        $metadataClient = new class ($folderTitle) implements ConfluenceFolderMetadataClientInterface {
+            public function __construct(private readonly string $folderTitle) {}
+
+            public function getFolder(string $folderId): ConfluenceFolderMetadata
+            {
+                return new ConfluenceFolderMetadata($folderId, $this->folderTitle);
+            }
+        };
+
+        return new ConfluenceClient($sdkFactory, $metadataClient);
     }
 
     private function pageResponse(string $id, string $spaceId): Response

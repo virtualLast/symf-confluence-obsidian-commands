@@ -123,6 +123,27 @@ The root page is depth zero. Pages at the maximum depth are imported but are not
 
 The destination and `--with-attachments` setting apply to every imported page. A failed descendant is reported while independent queued branches continue; root-page failures stop traversal immediately. Use `-v` for per-page traversal and failure details.
 
+### Folder imports
+
+Import every page contained in a Confluence folder hierarchy with:
+
+```shell
+php bin/console app:confluence:import-folder 404717571 Inbox/Confluence
+```
+
+The selected folder and each nested folder become directories beneath the requested destination. Folder names retain readable capitalization and spaces while unsafe filename characters are normalised. Pages are imported through the same single-page pipeline as `app:confluence:import`, and each Confluence page ID is imported at most once even if it appears in multiple folders.
+
+Confluence pages can also contain a mixed hierarchy of child pages and folders. A page with direct children remains a Markdown note in its parent directory and receives a same-named directory for those descendants. For example, `Projects` is written as `projects.md`, while its children are imported beneath `Projects/`. This continues recursively through both page and folder containers.
+
+Attachments remain opt-in:
+
+```shell
+php bin/console app:confluence:import-folder 404717571 Inbox/Confluence \
+    --with-attachments
+```
+
+Independent page or nested-folder failures are reported after the remaining hierarchy has been processed. Use `-v` to list traversed folders, imported pages, duplicate discoveries, and failures.
+
 ### Code blocks
 
 Confluence syntax-highlighter brushes are converted into Markdown fence languages. Common aliases such as `js`, `ts`, `sh`, and `yml` become `javascript`, `typescript`, `bash`, and `yaml` respectively.

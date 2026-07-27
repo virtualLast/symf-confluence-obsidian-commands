@@ -25,7 +25,8 @@ final readonly class ConfluenceImportTraversal
         $queue = new SplQueue();
         $root = new QueuedConfluencePage($rootPageId, 0, PageDiscoverySource::Root);
         $queue->enqueue($root);
-        $scheduled = [$this->pageKey($rootPageId) => true];
+        $scheduled = new ScheduledConfluencePages();
+        $scheduled->schedule($rootPageId);
         $importedPages = [];
         $failures = [];
         $duplicates = [];
@@ -117,7 +118,7 @@ final readonly class ConfluenceImportTraversal
 
         return new ConfluenceTraversalResult(
             1,
-            count($scheduled),
+            $scheduled->count(),
             $importedPages,
             $failures,
             $duplicates,
@@ -135,29 +136,19 @@ final readonly class ConfluenceImportTraversal
 
     /**
      * @param SplQueue<QueuedConfluencePage> $queue
-     * @param array<string, true> $scheduled
      * @param list<DuplicateConfluenceDiscovery> $duplicates
      */
     private function schedule(
         SplQueue $queue,
-        array &$scheduled,
+        ScheduledConfluencePages $scheduled,
         array &$duplicates,
         QueuedConfluencePage $page,
     ): void {
-        $key = $this->pageKey($page->pageId);
-
-        if (isset($scheduled[$key])) {
+        if (!$scheduled->schedule($page->pageId)) {
             $duplicates[] = new DuplicateConfluenceDiscovery($page);
 
             return;
         }
-
-        $scheduled[$key] = true;
         $queue->enqueue($page);
-    }
-
-    private function pageKey(string $pageId): string
-    {
-        return 'page:' . $pageId;
     }
 }

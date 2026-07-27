@@ -25,6 +25,9 @@ services:
     App\Confluence\ConfluenceGatewayInterface:
         alias: App\Confluence\ConfluenceClient
 
+    App\Confluence\ConfluenceFolderMetadataClientInterface:
+        alias: App\Confluence\ConfluenceFolderMetadataClient
+
     App\Confluence\ConfluencePageImportPipelineInterface:
         alias: App\Confluence\ConfluencePageImportPipeline
 

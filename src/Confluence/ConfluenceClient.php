@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Confluence;
 
 use App\Model\ConfluenceAttachment;
+use App\Model\ConfluenceFolder;
+use App\Model\ConfluenceFolderItem;
+use App\Model\ConfluenceFolderItemType;
 use App\Model\ConfluenceId;
 use App\Model\ConfluencePage;
 use App\Model\ConfluencePageReference;
@@ -12,6 +15,7 @@ use VirtualLast\ConfluenceV2\Exception\ApiException;
 use VirtualLast\ConfluenceV2\Exception\TransportException;
 use VirtualLast\ConfluenceV2\Generated\Model\AttachmentBulk;
 use VirtualLast\ConfluenceV2\Generated\Model\ChildPage;
+use VirtualLast\ConfluenceV2\Generated\Model\ChildrenResponse;
 
 final class ConfluenceClient implements ConfluenceGatewayInterface
 {
@@ -20,6 +24,7 @@ final class ConfluenceClient implements ConfluenceGatewayInterface
 
     public function __construct(
         private readonly ConfluenceSdkClientFactoryInterface $clientFactory,
+        private readonly ConfluenceFolderMetadataClientInterface $folderMetadataClient,
     ) {}
 
     public function getPage(string $pageId): ConfluencePage
@@ -50,6 +55,42 @@ final class ConfluenceClient implements ConfluenceGatewayInterface
                 spaceId: $spaceId,
                 spaceKey: $this->spaceKey($spaceId),
                 version: $page->getVersion()->getNumber(),
+            );
+        } catch (\Throwable $exception) {
+            throw $this->requestException($exception);
+        }
+    }
+
+    public function getFolder(string $folderId): ConfluenceFolder
+    {
+        try {
+            $client = $this->clientFactory->create();
+            $folder = $this->folderMetadataClient->getFolder($folderId);
+
+            $items = $this->mapDirectChildren(
+                $client->children()->iterateFolderDirectChildren(
+                    ConfluenceId::toInt($folderId),
+                ),
+            );
+
+            return new ConfluenceFolder(
+                $folder->id,
+                $folder->title,
+                $items,
+            );
+        } catch (\Throwable $exception) {
+            throw $this->requestException($exception);
+        }
+    }
+
+    public function getPageDirectChildren(string $pageId): array
+    {
+        try {
+            return $this->mapDirectChildren(
+                $this->clientFactory
+                    ->create()
+                    ->children()
+                    ->iteratePageDirectChildren(ConfluenceId::toInt($pageId)),
             );
         } catch (\Throwable $exception) {
             throw $this->requestException($exception);
@@ -135,6 +176,40 @@ final class ConfluenceClient implements ConfluenceGatewayInterface
         }
 
         return $this->spaceKeys[$spaceId] = $space->getKey();
+    }
+
+    /**
+     * @param iterable<mixed> $children
+     *
+     * @return list<ConfluenceFolderItem>
+     */
+    private function mapDirectChildren(iterable $children): array
+    {
+        $items = [];
+
+        foreach ($children as $child) {
+            if (!$child instanceof ChildrenResponse) {
+                throw new \UnexpectedValueException('The Confluence response contained an invalid direct child.');
+            }
+
+            $type = ConfluenceFolderItemType::tryFrom($child->getType());
+
+            if ($type === null) {
+                continue;
+            }
+
+            if (!ConfluenceId::isValid($child->getId())) {
+                throw new \UnexpectedValueException('The Confluence response contained an invalid direct child ID.');
+            }
+
+            $items[] = new ConfluenceFolderItem(
+                $child->getId(),
+                $child->getTitle(),
+                $type,
+            );
+        }
+
+        return $items;
     }
 
     private function requestException(\Throwable $exception): ConfluenceRequestException
