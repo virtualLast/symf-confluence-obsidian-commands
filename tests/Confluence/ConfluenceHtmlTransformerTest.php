@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Confluence;
 
+use App\Confluence\CodeBlock\CodeBlockLanguageDetector;
 use App\Confluence\ConfluenceHtmlTransformer;
 use App\Tests\Traits\FixtureTrait;
 use DOMDocument;
@@ -20,7 +21,7 @@ class ConfluenceHtmlTransformerTest extends TestCase
 
     public function setUp(): void
     {
-        $this->htmlTransformer = new ConfluenceHtmlTransformer();
+        $this->htmlTransformer = new ConfluenceHtmlTransformer(new CodeBlockLanguageDetector());
     }
 
     /**
@@ -74,27 +75,45 @@ HTML;
     public function itMapsCommonConfluenceBrushAliases(): void
     {
         foreach (
-            ['java' => 'markdown', 'ts' => 'typescript', 'sh' => 'bash', 'yml' => 'yaml'] as $brush => $language
+            [
+                'java' => ['public class Example {}', 'java'],
+                'ts' => ['const name: string = "example";', 'typescript'],
+                'sh' => ['echo "example"', 'bash'],
+                'yml' => ["example:\n  nested: true", 'yaml'],
+            ] as $brush => [$code, $language]
         ) {
             $html = sprintf(
-                '<pre data-syntaxhighlighter-params="gutter: false; brush: %s;">code</pre>',
+                '<pre data-syntaxhighlighter-params="gutter: false; brush: %s;">%s</pre>',
                 $brush,
+                $code,
             );
 
             self::assertSame(
-                sprintf('<pre><code class="language-%s">code</code></pre>', $language),
+                sprintf('<pre><code class="language-%s">%s</code></pre>', $language, $code),
                 $this->htmlTransformer->transform($html),
             );
         }
     }
 
     #[Test]
-    public function itLeavesCodeBlocksWithoutABrushUnchanged(): void
+    public function itOverridesAnIncorrectDeclaredLanguage(): void
+    {
+        $html = '<pre data-syntaxhighlighter-params="brush: java; gutter: false;">'
+            . '{"name":"demo","enabled":true}</pre>';
+
+        self::assertSame(
+            '<pre><code class="language-json">{"name":"demo","enabled":true}</code></pre>',
+            $this->htmlTransformer->transform($html),
+        );
+    }
+
+    #[Test]
+    public function itTransformsUnknownCodeBlocksToUnlabelledSemanticCode(): void
     {
         $html = '<pre class="syntaxhighlighter-pre" '
             . 'data-syntaxhighlighter-params="gutter: false; theme: Confluence">code</pre>';
 
-        self::assertSame($html, $this->htmlTransformer->transform($html));
+        self::assertSame('<pre><code>code</code></pre>', $this->htmlTransformer->transform($html));
     }
 
     /**

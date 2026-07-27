@@ -4,35 +4,16 @@ declare(strict_types=1);
 
 namespace App\Confluence;
 
+use App\Confluence\CodeBlock\CodeBlockLanguageDetectorInterface;
 use DOMElement;
 use DOMNode;
 use DOMXPath;
 
 final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
 {
-    private const array LANGUAGE_ALIASES = [
-        'bash' => 'bash',
-        'c#' => 'csharp',
-        'c++' => 'cpp',
-        'cpp' => 'cpp',
-        'css' => 'css',
-        'html' => 'html',
-        'java' => 'markdown',
-        'js' => 'javascript',
-        'json' => 'json',
-        'php' => 'php',
-        'py' => 'python',
-        'python' => 'python',
-        'rb' => 'ruby',
-        'ruby' => 'ruby',
-        'shell' => 'bash',
-        'sh' => 'bash',
-        'sql' => 'sql',
-        'ts' => 'typescript',
-        'xml' => 'xml',
-        'yaml' => 'yaml',
-        'yml' => 'yaml',
-    ];
+    public function __construct(
+        private readonly CodeBlockLanguageDetectorInterface $codeBlockLanguageDetector,
+    ) {}
 
     /**
      * Transforms rendered Confluence HTML into a structure better suited
@@ -65,14 +46,14 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
                 continue;
             }
 
-            $language = $this->languageFromSyntaxHighlighterParameters(
+            $declaredLanguage = $this->languageFromSyntaxHighlighterParameters(
                 $preformattedCode->getAttribute('data-syntaxhighlighter-params'),
             );
 
-            if ($language === null) {
-                continue;
-            }
-
+            $language = $this->codeBlockLanguageDetector->detect(
+                $declaredLanguage,
+                $preformattedCode->textContent,
+            );
             $this->transformCodeBlock($preformattedCode, $language);
         }
     }
@@ -83,12 +64,10 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
             return null;
         }
 
-        $brush = strtolower($matches[1]);
-
-        return self::LANGUAGE_ALIASES[$brush] ?? $brush;
+        return strtolower($matches[1]);
     }
 
-    private function transformCodeBlock(DOMElement $preformattedCode, string $language): void
+    private function transformCodeBlock(DOMElement $preformattedCode, ?string $language): void
     {
         $document = $preformattedCode->ownerDocument;
 
@@ -98,7 +77,9 @@ final class ConfluenceHtmlTransformer extends AbstractConfluenceDomDocument
 
         $semanticPre = $document->createElement('pre');
         $semanticCode = $document->createElement('code');
-        $semanticCode->setAttribute('class', 'language-' . $language);
+        if ($language !== null) {
+            $semanticCode->setAttribute('class', 'language-' . $language);
+        }
 
         while ($preformattedCode->firstChild !== null) {
             $semanticCode->appendChild($preformattedCode->firstChild);

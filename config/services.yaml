@@ -28,6 +28,9 @@ services:
     App\Confluence\ConfluencePageImportPipelineInterface:
         alias: App\Confluence\ConfluencePageImportPipeline
 
+    App\Confluence\CodeBlock\CodeBlockLanguageDetectorInterface:
+        alias: App\Confluence\CodeBlock\CodeBlockLanguageDetector
+
     App\Obsidian\ObsidianImageLinkBuilderInterface:
         alias: App\Obsidian\ObsidianImageLinkBuilder
 

@@ -12,13 +12,19 @@ final readonly class ConfluenceTraversalResult
      * @param list<DuplicateConfluenceDiscovery> $duplicates
      */
     public function __construct(
-        public int $pagesScheduled,
+        public int $rootPages,
+        public int $uniquePagesScheduled,
         public array $importedPages,
         public array $failures,
         public array $duplicates,
-        public int $childPagesFound,
-        public int $linkedPagesFound,
+        public int $childRelationshipsDiscovered,
+        public int $linkedPageRelationshipsDiscovered,
         public int $maximumDepthReached,
+        public bool $childTraversalEnabled,
+        public bool $linkedPageTraversalEnabled,
+        public ?int $maximumDepthConfigured,
+        public bool $attachmentsRequested,
+        public int $attachmentsDownloaded,
         public bool $rootFailed,
     ) {}
 
@@ -41,6 +47,11 @@ final readonly class ConfluenceTraversalResult
             $this->failures,
             static fn(ConfluenceTraversalFailure $failure): bool => $failure->type === TraversalFailureType::ChildDiscovery,
         ));
+    }
+
+    public function duplicateDiscoveries(): int
+    {
+        return count($this->duplicates);
     }
 
     public function hasFailures(): bool

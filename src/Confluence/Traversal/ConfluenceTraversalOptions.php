@@ -11,10 +11,6 @@ final readonly class ConfluenceTraversalOptions
         public bool $followLinks,
         public ?int $maximumDepth = null,
     ) {
-        if (!$this->followChildren && !$this->followLinks) {
-            throw new \InvalidArgumentException('At least one Confluence traversal strategy must be enabled.');
-        }
-
         if ($this->maximumDepth !== null && $this->maximumDepth < 0) {
             throw new \InvalidArgumentException('The traversal depth must be non-negative.');
         }

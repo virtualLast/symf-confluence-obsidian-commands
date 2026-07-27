@@ -29,9 +29,10 @@ final readonly class ConfluenceImportTraversal
         $importedPages = [];
         $failures = [];
         $duplicates = [];
-        $childPagesFound = 0;
-        $linkedPagesFound = 0;
+        $childRelationshipsDiscovered = 0;
+        $linkedPageRelationshipsDiscovered = 0;
         $maximumDepthReached = 0;
+        $attachmentsDownloaded = 0;
         $rootFailed = false;
 
         while (!$queue->isEmpty()) {
@@ -60,6 +61,7 @@ final readonly class ConfluenceImportTraversal
             }
 
             $importedPages[] = new ImportedTraversalPage($queuedPage, $completedImport);
+            $attachmentsDownloaded += count($completedImport->page->attachments);
 
             if (!$options->canExpand($queuedPage->depth)) {
                 continue;
@@ -68,7 +70,7 @@ final readonly class ConfluenceImportTraversal
             if ($options->followChildren) {
                 try {
                     $children = $this->confluenceGateway->getChildPages($completedImport->page->id);
-                    $childPagesFound += count($children);
+                    $childRelationshipsDiscovered += count($children);
 
                     foreach ($children as $child) {
                         $this->schedule(
@@ -94,7 +96,7 @@ final readonly class ConfluenceImportTraversal
             }
 
             if ($options->followLinks) {
-                $linkedPagesFound += count($completedImport->page->linkedPages);
+                $linkedPageRelationshipsDiscovered += count($completedImport->page->linkedPages);
 
                 foreach ($completedImport->page->linkedPages as $linkedPage) {
                     $this->schedule(
@@ -114,13 +116,19 @@ final readonly class ConfluenceImportTraversal
         }
 
         return new ConfluenceTraversalResult(
+            1,
             count($scheduled),
             $importedPages,
             $failures,
             $duplicates,
-            $childPagesFound,
-            $linkedPagesFound,
+            $childRelationshipsDiscovered,
+            $linkedPageRelationshipsDiscovered,
             $maximumDepthReached,
+            $options->followChildren,
+            $options->followLinks,
+            $options->maximumDepth,
+            $withAttachments,
+            $attachmentsDownloaded,
             $rootFailed,
         );
     }

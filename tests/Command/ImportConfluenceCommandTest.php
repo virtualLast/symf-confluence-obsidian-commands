@@ -103,18 +103,11 @@ final class ImportConfluenceCommandTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'Imported "SSO Overview"',
+            'Confluence import complete',
             $commandTester->getDisplay(),
         );
-
-        self::assertStringContainsString(
-            basename($expectedFilePath),
-            str_replace(
-                [" ", "\t", "\n", "\r", "\0", "\x0B"],
-                '',
-                $commandTester->getDisplay(),
-            ),
-        );
+        self::assertMatchesRegularExpression('/Root pages\s+1/', $commandTester->getDisplay());
+        self::assertMatchesRegularExpression('/Unique pages scheduled\s+1/', $commandTester->getDisplay());
     }
 
     /**
@@ -546,9 +539,9 @@ final class ImportConfluenceCommandTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertStringContainsString('Recursive Confluence import complete', $tester->getDisplay());
-        self::assertMatchesRegularExpression('/Pages scheduled\s+1/', $tester->getDisplay());
-        self::assertMatchesRegularExpression('/Maximum depth\s+0/', $tester->getDisplay());
+        self::assertStringContainsString('Confluence import complete', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Unique pages scheduled\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Maximum depth limit \\(--depth\\)\s+0/', $tester->getDisplay());
     }
 
     public function testItImportsDirectChildrenIntoTheSameDestinationWithAttachments(): void
@@ -585,7 +578,8 @@ final class ImportConfluenceCommandTest extends TestCase
         self::assertFileExists($this->vaultPath . '/Attachments/Confluence/root/1.txt');
         self::assertFileExists($this->vaultPath . '/Attachments/Confluence/child/2.txt');
         self::assertMatchesRegularExpression('/Pages imported\s+2/', $tester->getDisplay());
-        self::assertMatchesRegularExpression('/Child pages found\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Child relationships discovered\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Attachments downloaded\s+2/', $tester->getDisplay());
     }
 
     public function testItImportsDirectlyLinkedPagesWhenRequested(): void
@@ -610,7 +604,7 @@ final class ImportConfluenceCommandTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertMatchesRegularExpression('/Linked pages found\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Linked-page relationships discovered\s+1/', $tester->getDisplay());
         self::assertFileExists($this->vaultPath . '/linked.md');
     }
 
@@ -645,7 +639,56 @@ final class ImportConfluenceCommandTest extends TestCase
         self::assertSame(Command::FAILURE, $exitCode);
         self::assertFileExists($this->vaultPath . '/independent.md');
         self::assertMatchesRegularExpression('/Pages failed\s+1/', $tester->getDisplay());
-        self::assertStringContainsString('import failure for page 2 "Failed"', $tester->getDisplay());
+        self::assertStringContainsString('[failed] Failed (2) — Page unavailable.; linked from 1', $tester->getDisplay());
+    }
+
+    public function testVerboseCombinedTraversalReportsDiscoveryOriginsAndDuplicates(): void
+    {
+        $importer = $this->createMock(ConfluenceImporter::class);
+        $importer
+            ->expects(self::exactly(3))
+            ->method('importPage')
+            ->willReturnCallback(static fn(string $pageId): ImportedPage => match ($pageId) {
+                '1' => new ImportedPage('1', 'Root', 'Content', linkedPages: [
+                    new ImportedLinkedPage('3', 'Linked', 'url-3'),
+                ]),
+                '2' => new ImportedPage('2', 'Child', 'Content', linkedPages: [
+                    new ImportedLinkedPage('3', 'Linked', 'url-3'),
+                ]),
+                '3' => new ImportedPage('3', 'Linked', 'Content'),
+                default => throw new RuntimeException('Unexpected page ID ' . $pageId),
+            });
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
+        $client
+            ->expects(self::exactly(3))
+            ->method('getChildPages')
+            ->willReturnCallback(static fn(string $pageId): array => $pageId === '1'
+                ? [new ConfluencePageReference('2', 'Child')]
+                : []);
+
+        $tester = $this->createCommandTester($importer, confluenceGateway: $client);
+        $exitCode = $tester->execute(
+            [
+                'page' => '1',
+                '--recursive' => true,
+                '--follow-links' => true,
+            ],
+            ['verbosity' => OutputInterface::VERBOSITY_VERBOSE],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('[imported] Root (1) — root', $tester->getDisplay());
+        self::assertStringContainsString('[imported] Child (2) — child of 1', $tester->getDisplay());
+        self::assertStringContainsString('[imported] Linked (3) — linked from 1', $tester->getDisplay());
+        self::assertStringContainsString(
+            '[skipped] Linked (3) — already scheduled; linked from 2',
+            $tester->getDisplay(),
+        );
+        self::assertMatchesRegularExpression('/Child relationships discovered\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Linked-page relationships discovered\s+2/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Unique pages scheduled\s+3/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Duplicate discoveries\s+1/', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/Maximum traversal depth reached\s+1/', $tester->getDisplay());
     }
 
     private function createCommandTester(
@@ -676,7 +719,6 @@ final class ImportConfluenceCommandTest extends TestCase
             ),
         );
         $command = new ImportConfluenceCommand(
-            importPipeline: $pipeline,
             importTraversal: new ConfluenceImportTraversal(
                 $pipeline,
                 $confluenceGateway ?? $this->createStub(ConfluenceGatewayInterface::class),

@@ -10,6 +10,7 @@ use App\Confluence\ConfluencePageImportPipelineInterface;
 use App\Confluence\Traversal\ConfluenceImportTraversal;
 use App\Confluence\Traversal\ConfluenceTraversalOptions;
 use App\Model\ConfluencePageReference;
+use App\Model\ImportedAttachment;
 use App\Model\ImportedLinkedPage;
 use App\Model\ImportedPage;
 use PHPUnit\Framework\TestCase;
@@ -46,12 +47,17 @@ final class ConfluenceImportTraversalTest extends TestCase
             ['root', 'child-1', 'child-2', 'linked', 'deep-child', 'linked-child'],
             $importOrder,
         );
-        self::assertSame(6, $result->pagesScheduled);
+        self::assertSame(1, $result->rootPages);
+        self::assertSame(6, $result->uniquePagesScheduled);
         self::assertSame(6, $result->pagesImported());
-        self::assertSame(5, $result->childPagesFound);
-        self::assertSame(2, $result->linkedPagesFound);
+        self::assertSame(5, $result->childRelationshipsDiscovered);
+        self::assertSame(2, $result->linkedPageRelationshipsDiscovered);
         self::assertCount(2, $result->duplicates);
         self::assertSame(2, $result->maximumDepthReached);
+        self::assertTrue($result->childTraversalEnabled);
+        self::assertTrue($result->linkedPageTraversalEnabled);
+        self::assertSame(2, $result->maximumDepthConfigured);
+        self::assertTrue($result->attachmentsRequested);
         self::assertFalse($result->hasFailures());
     }
 
@@ -71,10 +77,10 @@ final class ConfluenceImportTraversalTest extends TestCase
             new ConfluenceTraversalOptions(true, true, 0),
         );
 
-        self::assertSame(1, $result->pagesScheduled);
+        self::assertSame(1, $result->uniquePagesScheduled);
         self::assertSame(1, $result->pagesImported());
-        self::assertSame(0, $result->childPagesFound);
-        self::assertSame(0, $result->linkedPagesFound);
+        self::assertSame(0, $result->childRelationshipsDiscovered);
+        self::assertSame(0, $result->linkedPageRelationshipsDiscovered);
     }
 
     public function testItPreventsAnUnlimitedLinkedCycle(): void
@@ -91,7 +97,7 @@ final class ConfluenceImportTraversalTest extends TestCase
         );
 
         self::assertSame(['a', 'b'], $importOrder);
-        self::assertSame(2, $result->pagesScheduled);
+        self::assertSame(2, $result->uniquePagesScheduled);
         self::assertCount(1, $result->duplicates);
         self::assertSame('a', $result->duplicates[0]->page->pageId);
     }
@@ -133,7 +139,7 @@ final class ConfluenceImportTraversalTest extends TestCase
         );
 
         self::assertTrue($result->rootFailed);
-        self::assertSame(1, $result->pagesScheduled);
+        self::assertSame(1, $result->uniquePagesScheduled);
         self::assertSame(1, $result->pagesFailed());
         self::assertSame(0, $result->pagesImported());
     }
@@ -169,6 +175,40 @@ final class ConfluenceImportTraversalTest extends TestCase
         self::assertSame(1, $result->childDiscoveryFailures());
         self::assertSame(0, $result->pagesFailed());
         self::assertTrue($result->hasFailures());
+    }
+
+    public function testRootOnlyTraversalReportsOptionsAndAttachmentTotals(): void
+    {
+        $pipeline = $this->createMock(ConfluencePageImportPipelineInterface::class);
+        $pipeline
+            ->expects(self::once())
+            ->method('import')
+            ->with('root', '', true)
+            ->willReturn($this->completed(new ImportedPage(
+                'root',
+                'Root',
+                'Content',
+                attachments: [
+                    new ImportedAttachment('1', 'one.txt', 'one'),
+                    new ImportedAttachment('2', 'two.txt', 'two'),
+                ],
+            )));
+        $client = $this->createMock(ConfluenceGatewayInterface::class);
+        $client->expects(self::never())->method('getChildPages');
+
+        $result = new ConfluenceImportTraversal($pipeline, $client)->traverse(
+            'root',
+            new ConfluenceTraversalOptions(false, false),
+            withAttachments: true,
+        );
+
+        self::assertSame(1, $result->rootPages);
+        self::assertSame(1, $result->uniquePagesScheduled);
+        self::assertSame(2, $result->attachmentsDownloaded);
+        self::assertTrue($result->attachmentsRequested);
+        self::assertFalse($result->childTraversalEnabled);
+        self::assertFalse($result->linkedPageTraversalEnabled);
+        self::assertSame(0, $result->maximumDepthReached);
     }
 
     /**

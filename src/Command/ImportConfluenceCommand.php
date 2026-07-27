@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Confluence\ConfluencePageImportPipelineInterface;
 use App\Confluence\Traversal\ConfluenceImportTraversal;
 use App\Confluence\Traversal\ConfluenceTraversalOptions;
 use App\Confluence\Traversal\ConfluenceTraversalResult;
 use App\Confluence\Traversal\PageDiscoverySource;
+use App\Confluence\Traversal\TraversalFailureType;
 use App\Model\ConfluenceId;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -32,7 +32,6 @@ final class ImportConfluenceCommand extends Command
     private const string DEPTH_OPTION = 'depth';
 
     public function __construct(
-        private readonly ConfluencePageImportPipelineInterface $importPipeline,
         private readonly ConfluenceImportTraversal $importTraversal,
     ) {
         parent::__construct();
@@ -138,15 +137,6 @@ final class ImportConfluenceCommand extends Command
             $maximumDepth = (int) $normalisedDepth;
         }
 
-        if (!$followChildren && !$followLinks) {
-            return $this->importSinglePage(
-                $io,
-                $pageArgument,
-                $destination,
-                $withAttachments,
-            );
-        }
-
         try {
             $result = $this->importTraversal->traverse(
                 $pageArgument,
@@ -165,43 +155,9 @@ final class ImportConfluenceCommand extends Command
         }
 
         $this->renderTraversalDetails($io, $result);
-        $this->renderTraversalSummary(
-            $io,
-            $pageArgument,
-            $followChildren,
-            $followLinks,
-            $maximumDepth,
-            $result,
-        );
+        $this->renderTraversalSummary($io, $result);
 
         return $result->hasFailures() ? Command::FAILURE : Command::SUCCESS;
-    }
-
-    private function importSinglePage(
-        SymfonyStyle $io,
-        string $pageId,
-        string $destination,
-        bool $withAttachments,
-    ): int {
-        try {
-            $completedImport = $this->importPipeline->import(
-                $pageId,
-                $destination,
-                $withAttachments,
-            );
-        } catch (\Exception $exception) {
-            $io->error($exception->getMessage());
-
-            return Command::FAILURE;
-        }
-
-        $io->success(sprintf(
-            'Imported "%s" to "%s".',
-            $completedImport->page->title,
-            $completedImport->filePath,
-        ));
-
-        return Command::SUCCESS;
     }
 
     private function renderTraversalDetails(
@@ -230,65 +186,75 @@ final class ImportConfluenceCommand extends Command
         foreach ($result->importedPages as $imported) {
             $page = $imported->queuedPage;
             $io->writeln(sprintf(
-                'Imported page %s "%s" at depth %d via %s%s',
-                $page->pageId,
+                '[imported] %s (%s) — %s',
                 $imported->completedImport->page->title,
-                $page->depth,
-                $page->source->value,
-                $page->referringPageId === null ? '' : ' from ' . $page->referringPageId,
+                $page->pageId,
+                $this->discoveryDescription($page->source, $page->referringPageId),
             ));
         }
 
         foreach ($result->duplicates as $duplicate) {
             $page = $duplicate->page;
             $io->writeln(sprintf(
-                'Duplicate discovery %s%s at depth %d via %s%s',
+                '[skipped] %s (%s) — already scheduled; %s',
+                $page->knownTitle ?? $page->pageId,
                 $page->pageId,
-                $page->knownTitle === null ? '' : sprintf(' "%s"', $page->knownTitle),
-                $page->depth,
-                $page->source->value,
-                $page->referringPageId === null ? '' : ' from ' . $page->referringPageId,
+                $this->discoveryDescription($page->source, $page->referringPageId),
             ));
         }
 
         foreach ($result->failures as $failure) {
-            $page = $failure->page;
             $io->writeln(sprintf(
-                '%s failure for page %s%s at depth %d via %s%s: %s',
-                $failure->type->value,
-                $page->pageId,
-                $page->knownTitle === null ? '' : sprintf(' "%s"', $page->knownTitle),
-                $page->depth,
-                $page->source->value,
-                $page->referringPageId === null ? '' : ' from ' . $page->referringPageId,
+                '[failed] %s (%s) — %s%s; %s',
+                $failure->page->knownTitle ?? $failure->page->pageId,
+                $failure->page->pageId,
+                $failure->type === TraversalFailureType::ChildDiscovery ? 'child discovery: ' : '',
                 $failure->message,
+                $this->discoveryDescription(
+                    $failure->page->source,
+                    $failure->page->referringPageId,
+                ),
             ));
         }
     }
 
     private function renderTraversalSummary(
         SymfonyStyle $io,
-        string $rootPageId,
-        bool $followChildren,
-        bool $followLinks,
-        ?int $maximumDepth,
         ConfluenceTraversalResult $result,
     ): void {
-        $io->title('Recursive Confluence import complete');
-        $io->definitionList(
-            ['Root page' => $rootPageId],
-            ['Follow child pages' => $followChildren ? 'yes' : 'no'],
-            ['Follow linked pages' => $followLinks ? 'yes' : 'no'],
-            ['Maximum depth' => $maximumDepth === null ? 'unlimited' : (string) $maximumDepth],
-            ['Pages scheduled' => (string) $result->pagesScheduled],
+        $definitions = [
+            ['Root pages' => (string) $result->rootPages],
+            ['Child traversal (--recursive)' => $result->childTraversalEnabled ? 'enabled' : 'disabled'],
+            ['Linked-page traversal (--follow-links)' => $result->linkedPageTraversalEnabled ? 'enabled' : 'disabled'],
+            ['Maximum depth limit (--depth)' => $result->maximumDepthConfigured === null
+                ? 'unlimited'
+                : (string) $result->maximumDepthConfigured],
+            ['Child relationships discovered' => (string) $result->childRelationshipsDiscovered],
+            ['Linked-page relationships discovered' => (string) $result->linkedPageRelationshipsDiscovered],
+            ['Unique pages scheduled' => (string) $result->uniquePagesScheduled],
             ['Pages imported' => (string) $result->pagesImported()],
             ['Pages failed' => (string) $result->pagesFailed()],
-            ['Duplicate discoveries' => (string) count($result->duplicates)],
-            ['Child pages found' => (string) $result->childPagesFound],
-            ['Linked pages found' => (string) $result->linkedPagesFound],
-            ['Maximum depth reached' => (string) $result->maximumDepthReached],
+            ['Duplicate discoveries' => (string) $result->duplicateDiscoveries()],
+            ['Maximum traversal depth reached' => (string) $result->maximumDepthReached],
             ['Child discovery failures' => (string) $result->childDiscoveryFailures()],
-        );
+        ];
+
+        if ($result->attachmentsRequested) {
+            $definitions[] = ['Attachments downloaded' => (string) $result->attachmentsDownloaded];
+        }
+
+        $io->title('Confluence import complete');
+        $io->definitionList(...$definitions);
     }
 
+    private function discoveryDescription(
+        PageDiscoverySource $source,
+        ?string $referringPageId,
+    ): string {
+        return match ($source) {
+            PageDiscoverySource::Root => 'root',
+            PageDiscoverySource::Child => 'child of ' . $referringPageId,
+            PageDiscoverySource::Linked => 'linked from ' . $referringPageId,
+        };
+    }
 }

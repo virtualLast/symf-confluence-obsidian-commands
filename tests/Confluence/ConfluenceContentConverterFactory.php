@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Confluence;
 
+use App\Confluence\CodeBlock\CodeBlockLanguageDetector;
 use App\Confluence\ConfluenceAttachmentListPlaceholderTransformer;
 use App\Confluence\ConfluenceContentConverter;
 use App\Confluence\ConfluenceHtmlCleaner;
@@ -30,7 +31,7 @@ final class ConfluenceContentConverterFactory
 
         return new ConfluenceContentConverter(
             new ConfluenceHtmlCleaner(),
-            new ConfluenceHtmlTransformer(),
+            new ConfluenceHtmlTransformer(new CodeBlockLanguageDetector()),
             new ConfluenceImagePlaceholderTransformer(),
             new ConfluenceAttachmentListPlaceholderTransformer(),
             $htmlConverter,
