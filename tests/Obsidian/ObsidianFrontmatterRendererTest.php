@@ -50,6 +50,13 @@ final class ObsidianFrontmatterRendererTest extends TestCase
             ],
             $metadata['relationships']['linkedPages'],
         );
+        self::assertSame(
+            [
+                'status' => 'pending',
+                'destination' => null,
+            ],
+            $metadata['promotion'],
+        );
         self::assertSame("\n\n# SSO Overview", $content);
     }
 

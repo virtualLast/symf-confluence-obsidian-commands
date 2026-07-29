@@ -31,6 +31,10 @@ final readonly class ObsidianFrontmatterRenderer
                     $page->linkedPages,
                 ),
             ],
+            'promotion' => [
+                'status' => 'pending',
+                'destination' => null,
+            ],
         ];
 
         return "---\n"
