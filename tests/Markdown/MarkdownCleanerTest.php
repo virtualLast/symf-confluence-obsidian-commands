@@ -20,6 +20,22 @@ class MarkdownCleanerTest extends TestCase
         $this->cleaner = new MarkdownCleaner();
     }
 
+    public function testItPreservesCodeInsideNestedCalloutsAndResumesProseCleaningAfterwards(): void
+    {
+        $literal = '&lt;div&gt; - Getting issue details... STATUS';
+        $input = "> [!note]- Outer\n> > [!note]- Inner\n> > ```text\n> > $literal\n> > > ```\n> > $literal\n> > ```\n\nAfter &amp; prose\n";
+        $expected = str_replace('After &amp; prose', 'After & prose', $input);
+        self::assertSame($expected, $this->cleaner->clean($input));
+    }
+
+    public function testAnUnclosedQuotedFenceDoesNotProtectFollowingUnquotedProse(): void
+    {
+        self::assertSame(
+            "> ```\n> &lt;code&gt;\nAfter & prose\n",
+            $this->cleaner->clean("> ```\n> &lt;code&gt;\nAfter &amp; prose\n"),
+        );
+    }
+
     /**
      * What: Markdown whitespace is cleaned without changing fenced code blocks.
      * How: Fixture pairs cover excess blanks and several closed and unclosed fence styles.

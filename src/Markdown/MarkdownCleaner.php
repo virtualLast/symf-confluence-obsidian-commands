@@ -62,6 +62,10 @@ final class MarkdownCleaner
         $openFence = null;
 
         foreach ($lines as $line) {
+            if ($openFence !== null && $this->withoutQuotePrefix($line, $openFence['quoteDepth']) === null) {
+                // An unclosed fence ends when its containing blockquote ends.
+                $openFence = null;
+            }
             if ($openFence !== null) {
                 $cleanedLines[] = $line;
 
@@ -179,13 +183,13 @@ final class MarkdownCleaner
     }
 
     /**
-     * @return array{character: string, length: int}|null
+     * @return array{character: string, length: int, quoteDepth: int}|null
      */
     private function findOpeningFence(string $line): ?array
     {
         if (
             preg_match(
-                '/^ {0,3}(`{3,}|~{3,})/',
+                '/^((?: {0,3}>[ \t]?)*)(?: {0,3})(`{3,}|~{3,})/',
                 $line,
                 $matches,
             ) !== 1
@@ -194,18 +198,23 @@ final class MarkdownCleaner
         }
 
         return [
-            'character' => $matches[1][0],
-            'length' => strlen($matches[1]),
+            'character' => $matches[2][0],
+            'length' => strlen($matches[2]),
+            'quoteDepth' => substr_count($matches[1], '>'),
         ];
     }
 
     /**
-     * @param array{character: string, length: int} $openFence
+     * @param array{character: string, length: int, quoteDepth: int} $openFence
      */
     private function closesFence(
         string $line,
         array $openFence,
     ): bool {
+        $line = $this->withoutQuotePrefix($line, $openFence['quoteDepth']);
+        if ($line === null) {
+            return false;
+        }
         $character = preg_quote(
             $openFence['character'],
             '/',
@@ -220,4 +229,18 @@ final class MarkdownCleaner
             $line,
         ) === 1;
     }
+
+    /** Remove exactly the containing quote prefixes, preserving literal quotes in code. */
+    private function withoutQuotePrefix(string $line, int $depth): ?string
+    {
+        for ($level = 0; $level < $depth; ++$level) {
+            if (preg_match('/^ {0,3}>[ \t]?/', $line, $match) !== 1) {
+                return null;
+            }
+            $line = substr($line, strlen($match[0]));
+        }
+
+        return $line;
+    }
+
 }

@@ -72,11 +72,36 @@ The note path may be absolute or relative to `OBSIDIAN_VAULT`, and must resolve 
 
 The preview shows the full destination URL, current page title and version, current storage markup, proposed storage markup, and warnings. It performs a remote read but no writes. Publishing displays the same preview and then replaces the body. The configured site must be the one the note came from: imported metadata does not record a site address.
 
-**The local body is authoritative.** Direct Confluence edits, macros, layouts, and other content absent from the exported body are overwritten. The entire Markdown body is included, including its first heading; YAML frontmatter is excluded. The title, parent location, existing attached files, and local note are left unchanged. The imported version is ignored. Publishing fetches the latest remote version and submits one update; concurrent-update failures stop without retrying. Transport failures may have an uncertain outcome: inspect the page before retrying.
+**The local body is authoritative.** Direct Confluence edits, macros, layouts, and other content absent from the exported body are overwritten. The entire Markdown body is included, including its first heading; YAML frontmatter is excluded. The title, parent location, and local note are left unchanged. Referenced local images are uploaded or updated; unused attachments are left untouched. The imported version is ignored. Publishing fetches the latest remote version and submits one update; concurrent-update failures stop without retrying. Transport failures may have an uncertain outcome: inspect the page before retrying.
 
-Supported content includes headings, paragraphs, emphasis, lists, code, tables, and links. Markdown images and Obsidian `![[...]]` embeds are omitted with individual warnings; attachment upload and deletion are not implemented. Raw HTML/Confluence markup and detected unsupported Obsidian syntax (including callouts, comments, footnotes, highlights, and block links) fail validation. Code examples remain literal.
+Supported content includes headings, paragraphs, emphasis, lists, code, tables, and links. Local Markdown images and Obsidian image embeds (`![[...]]`) are uploaded as page attachments. HTTP(S) image URLs remain external references. Non-image file/note embeds are omitted with warnings. Attachment deletion is not implemented. Raw HTML/Confluence markup and detected unsupported Obsidian syntax (including non-collapsible callouts, comments, footnotes, highlights, and block links) fail validation. Code examples remain literal.
 
 Wikilinks such as `[[note#Heading|Label]]` resolve to the target imported note's original Confluence page. Bare names must be unique across the vault; paths such as `[[Folder/note]]` are vault-relative, and `[[./note]]` is relative to the source note. Ordinary relative Markdown links resolve relative to the source file. Missing, ambiguous, or local-only targets block publication. HTTP, HTTPS, and mail links are preserved. Local links never cause other notes to be published.
+
+#### Expand sections
+
+Imported Confluence Expand sections become collapsible callouts:
+
+```markdown
+> [!note]- Section title
+> Content inside the section.
+>
+> - List item
+```
+
+Export converts collapsible callouts (`[!type]-` or `[!type]+`) into native Confluence Expand macros. Titles and nested content are preserved; Confluence controls the initial collapsed display. Ordinary headings and blockquotes stay unchanged. Expand sections already flattened by older imports need re-importing or explicit callout markers. Re-import overwrites local notes, so preserve local edits first.
+
+#### Images and attachment updates
+
+The preview lists each planned upload with its vault-relative path, destination filename, and byte count. Uploads happen only with `--publish`, before the body update. Local image paths must resolve inside the vault; missing, unreadable, ambiguous, or invalid images stop the export. Supported image formats are PNG, JPEG, GIF, WebP, SVG, BMP, and AVIF. `![[image.png|300]]` and `![[image.png|300x200]]` preserve size hints.
+
+Bare wikilink image names must be unique within the vault. Paths in image wikilinks are vault-relative; `./` and `../` are relative to the note. Markdown image paths are note-relative, with a leading `/` selecting the vault root.
+
+Attachments receive names such as `obsidian-<path-hash>-image.png`. The hash uses the vault-relative path, so changed image bytes update the same attachment and different paths get different names. Moving or renaming an image creates a new managed attachment. The first export creates a managed copy rather than overwriting an unrelated original attachment with the same basename. Repeated references in a note upload once per invocation; repeated publications may add attachment versions even when image bytes are unchanged.
+
+Attachment and page updates are not atomic. If an upload or the later page update fails, already completed attachment updates can remain. The command stops, reports this partial outcome, and does not retry or delete attachments. Existing remote edits are still overwritten on a subsequent explicit publish.
+
+See the [Expand and image extension specification](docs/specs/confluence-expand-images.md).
 
 Success returns exit code 0; validation, read, or publish failures return 1. Publishing reports the resulting version and page URL. See the [approved export specification](docs/specs/confluence-export.md).
 

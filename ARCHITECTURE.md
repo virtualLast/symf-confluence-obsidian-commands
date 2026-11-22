@@ -13,9 +13,9 @@ This Symfony console application moves content between Confluence Cloud and an O
 `ExportConfluenceCommand` orchestrates validation, conversion, preview, and optional publication. Classes under `src/Confluence/Export` provide these responsibilities:
 
 - `ExportNoteReader` resolves a note inside a vault, validates imported frontmatter, and separates its body without writing locally.
-- `ExportContentConverter` uses League CommonMark with table support and `WikiLinkParser`. It skips images/embeds with warnings, rejects detected unsupported syntax, and keeps code literal.
+- `ExportContentConverter` uses League CommonMark with table support and `WikiLinkParser`. It transforms collapsible callouts into `ExpandBlock` nodes, resolves image references into native Confluence storage plus a deduplicated upload plan, skips non-image embeds, and keeps code literal.
 - `ExportLinkResolver` resolves local references to imported note identities, rejecting missing or ambiguous targets. `ConfluencePageUrl` constructs links on the configured site.
-- `ConfluenceExportGatewayInterface` separates preview/publication from SDK transport. `ConfluenceExportClient` reads storage markup and submits one versioned replacement through the existing SDK factory. It leaves page location and attached files untouched.
+- `ConfluenceExportGatewayInterface` separates preview/publication from SDK transport. `ConfluenceExportClient` reads storage markup and submits one versioned replacement through the existing SDK factory. It leaves page location untouched. `ConfluenceAttachmentPublisherInterface` handles image upserts separately from the v2 page gateway.
 - `ExportNote`, `ConvertedExport`, and `ExportPage` carry validated local input, conversion output, and observed remote state.
 
 ```mermaid
@@ -26,7 +26,8 @@ flowchart TD
     Fetch --> Preview[Display destination, before/after, and warnings]
     Preview --> Gate{--publish?}
     Gate -->|No| Done[Finish without writes]
-    Gate -->|Yes| Update[PUT original page with current version + 1]
+    Gate -->|Yes| Upload[PUT local images as attachments using stable names]
+    Upload --> Update[PUT original page with current version + 1]
     Update --> Result[Report version and URL, or failure without retry]
 ```
 
@@ -38,4 +39,13 @@ Export adds `app:confluence:export <note> [--vault=...] [--publish]` and a Confl
 
 The installed SDK's generated `PagesIdPutBody` normalizer passes its body union through directly. The adapter supplies an associative array; supplying a `PageBodyWrite` object produces an empty JSON body. Transport-level tests protect this contract.
 
-The site origin is configured, not stored in note metadata. The command cannot establish that a page ID came from that site. Attachment reconciliation, creating pages, automatic syncing, and lossless macro conversion are outside this version. Tests use local files and a queued HTTP transport; they do not establish live Confluence rendering fidelity or deployment configuration.
+The site origin is configured, not stored in note metadata. The command cannot establish that a page ID came from that site. Creating pages, automatic syncing, deleting attachments, and conversion of macros other than Expand are outside this version. Tests use local files and a queued HTTP transport; they do not establish live Confluence rendering fidelity or deployment configuration.
+
+
+**2026-11-22 — Approved Expand and image extension.** `ConfluenceHtmlCleaner` retains Expand titles as container attributes before removing UI controls. `ExpandHtmlConverter` converts those annotated containers after their children are Markdown, preserving nesting as collapsible callouts. `ExpandCalloutTransformer` promotes explicitly collapsible blockquotes to typed nodes; the renderer writes native Expand storage. Previously flattened notes cannot recover section boundaries automatically.
+
+`ExportImageResolver` validates local files within the vault and captures their bytes into `ExportImage` objects. Names use a hash of the vault-relative path, so references are stable across edits and distinct for files in different directories. External images render as `ri:url` without downloads. `ConvertedExport` carries a deduplicated upload plan alongside storage and warnings.
+
+Publication uses the v1 `PUT /wiki/rest/api/content/{id}/child/attachment` multipart create-or-update endpoint through `ConfluenceAttachmentPublisher`. The installed v2 SDK lacks attachment upload, so this adapter follows the existing Symfony HTTP client pattern used for folder metadata. Symfony Mime constructs multipart requests; the PHP fileinfo extension validates local image media types. Test transports verify the filename, bytes, authentication header and anti-CSRF header.
+
+The command previews the upload plan before the write gate, uploads each image, then publishes the body using the fetched page version. Attachment uploads and page replacement are separate operations, so failure can leave uploaded attachment versions behind. The command reports partial outcomes, does not retry writes, and does not delete attachments. See [extension specification](docs/specs/confluence-expand-images.md).

@@ -17,9 +17,9 @@ use League\CommonMark\Renderer\HtmlRenderer;
 
 final readonly class ExportContentConverter
 {
-    public function __construct(private ExportLinkResolver $links) {}
+    public function __construct(private ExportLinkResolver $links, private ExportImageResolver $images = new ExportImageResolver()) {}
 
-    /** Convert supported Markdown, resolve links, and omit images with warnings. */
+    /** Convert supported Markdown, resolve links and images, and preserve Expand callouts. */
     public function convert(ExportNote $note): ConvertedExport
     {
         $environment = new Environment(['html_input' => 'escape', 'allow_unsafe_links' => false]);
@@ -27,7 +27,11 @@ final readonly class ExportContentConverter
         $environment->addExtension(new TableExtension());
         $environment->addInlineParser(new WikiLinkParser(), 250);
         $environment->addInlineParser(new UnsupportedSyntaxParser(), 240);
+        $environment->addRenderer(ExpandBlock::class, new ExpandBlockRenderer());
+        $environment->addRenderer(Image::class, new ConfluenceImageRenderer(), 100);
         $document = (new MarkdownParser($environment))->parse($note->markdown);
+        (new ExpandCalloutTransformer())->transform($document);
+        $images = [];
         $warnings = [];
         $remove = [];
         $walker = $document->walker();
@@ -37,8 +41,15 @@ final readonly class ExportContentConverter
             }
             $node = $event->getNode();
             if ($node instanceof Image) {
-                $warnings[] = 'Skipped image or embed: ' . $node->getUrl();
-                $remove[] = $node;
+                if ($this->images->isNonImageEmbed($node)) {
+                    $warnings[] = 'Skipped non-image embed: ' . $node->getUrl();
+                    $remove[] = $node;
+                } else {
+                    $image = $this->images->resolve($node, $note);
+                    if ($image !== null) {
+                        $images[$image->filename] = $image;
+                    }
+                }
                 $walker->resumeAt($node, false);
             } elseif ($node instanceof UnsupportedSyntax) {
                 throw new \InvalidArgumentException('Unsupported Obsidian or extended Markdown syntax: ' . $node->literal);
@@ -62,6 +73,6 @@ final readonly class ExportContentConverter
             $node->detach();
         }
 
-        return new ConvertedExport((string) (new HtmlRenderer($environment))->renderDocument($document), $warnings);
+        return new ConvertedExport((string) (new HtmlRenderer($environment))->renderDocument($document), $warnings, array_values($images));
     }
 }

@@ -25,6 +25,7 @@ final readonly class ConfluenceContentConverter
                 new TableConverter()
             )
         ;
+        $this->htmlConverter->getEnvironment()->addConverter(new ExpandHtmlConverter());
     }
 
     /** @param list<ImportedAttachment> $attachments */

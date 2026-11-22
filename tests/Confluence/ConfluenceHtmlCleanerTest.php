@@ -148,7 +148,7 @@ HTML;
 
         // Assert
         self::assertStringNotContainsString('expand-control', $clean);
-        self::assertStringNotContainsString('expand here', $clean);
+        self::assertStringContainsString('data-obsidian-expand-title="expand here"', $clean);
         self::assertStringNotContainsString('grey_arrow_down.png', $clean);
     }
 

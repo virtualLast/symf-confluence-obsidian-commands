@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Confluence\Export\ConfluenceAttachmentPublisherInterface;
 use App\Confluence\Export\ConfluenceExportGatewayInterface;
 use App\Confluence\Export\ConfluencePageUrl;
 use App\Confluence\Export\ExportContentConverter;
@@ -25,6 +26,7 @@ final class ExportConfluenceCommand extends Command
         private readonly ExportContentConverter $converter,
         private readonly ConfluenceExportGatewayInterface $gateway,
         private readonly ConfluencePageUrl $pageUrl,
+        private readonly ConfluenceAttachmentPublisherInterface $attachments,
     ) {
         parent::__construct();
     }
@@ -41,6 +43,7 @@ final class ExportConfluenceCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        $attachmentWritesStarted = false;
         try {
             $vault = $input->getOption('vault');
             $note = $this->reader->read((string) $input->getArgument('note'), is_string($vault) ? $vault : null);
@@ -49,9 +52,12 @@ final class ExportConfluenceCommand extends Command
             $url = $this->pageUrl->forPage($page->id);
             $io->title('Confluence export');
             $io->text(OutputFormatter::escape(sprintf("Destination: %s\nTitle: %s\nCurrent version: %d", $url, $page->title, $page->version)));
-            $io->warning('The local body replaces all remote content, including direct Confluence edits. Images and embeds are omitted; existing attachment files remain.');
+            $io->warning('The local body replaces all remote content, including direct Confluence edits. Referenced local images are uploaded; unused attachments remain.');
             foreach ($converted->warnings as $warning) {
                 $io->warning(OutputFormatter::escape($warning));
+            }
+            foreach ($converted->images as $image) {
+                $io->text(OutputFormatter::escape(sprintf('Upload/update image: %s -> %s (%d bytes)', $image->vaultPath, $image->filename, strlen($image->content))));
             }
             if (preg_match('/<(?:ac:|ri:)/i', $page->storage) === 1) {
                 $io->warning('The current page contains Confluence macros, layouts, or resource references. They will be replaced by the local body.');
@@ -65,12 +71,19 @@ final class ExportConfluenceCommand extends Command
 
                 return Command::SUCCESS;
             }
+            foreach ($converted->images as $image) {
+                $attachmentWritesStarted = true;
+                $this->attachments->publish($page->id, $image);
+            }
             $version = $this->gateway->publish($page, $converted->storage);
             $io->success(OutputFormatter::escape(sprintf('Published version %d: %s', $version, $url)));
 
             return Command::SUCCESS;
         } catch (\Throwable $exception) {
             $io->error(OutputFormatter::escape($exception->getMessage()));
+            if ($attachmentWritesStarted) {
+                $io->warning('Some image attachments may already have been updated. The page body was not confirmed published; inspect Confluence before retrying.');
+            }
 
             return Command::FAILURE;
         }

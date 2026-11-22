@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Confluence;
 
+use DOMElement;
 use DOMNode;
 use DOMXPath;
 
@@ -23,7 +24,21 @@ final class ConfluenceHtmlCleaner extends AbstractConfluenceCleaner
             '//style',
         );
 
-        // Remove the expand/collapse control while preserving the expanded content.
+        // Capture titles before removing UI controls, without confusing nested Expands.
+        $containers = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " expand-container ")]');
+        if ($containers !== false) {
+            foreach ($containers as $container) {
+                if (!$container instanceof DOMElement) {
+                    continue;
+                }
+                $labels = $xpath->query('./*[contains(concat(" ", normalize-space(@class), " "), " expand-control ")]//*[contains(concat(" ", normalize-space(@class), " "), " expand-control-text ")]', $container);
+                $label = $labels !== false ? $labels->item(0) : null;
+                $title = $label instanceof DOMNode ? trim($label->textContent) : '';
+                $container->setAttribute('data-obsidian-expand-title', $title !== '' ? $title : 'Details');
+            }
+        }
+
+        // Remove the expand/collapse control while preserving its title and content.
         $this->removeElements(
             $xpath,
             '//*[contains(concat(" ", normalize-space(@class), " "), " expand-control ")]',

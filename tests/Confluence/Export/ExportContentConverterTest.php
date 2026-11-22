@@ -63,23 +63,98 @@ MD);
         self::assertStringNotContainsString('source: confluence', $result->storage);
     }
 
-    public function testItSkipsAllImageFormsAndWikiEmbedsButPreservesSurroundingText(): void
+    public function testItPlansImagesAndSkipsNonImageEmbeds(): void
     {
-        $this->note('source', "Before ![[missing.png]] after ![alt](missing.png) ![ref][image]\n\n![[another-note]]\n\n[image]: https://example.com/image.png");
+        $this->image('image.png');
+        $this->note('source', "Before ![[image.png|300x200]] after ![alt](image.png) ![ref][image]\n\n![[another-note]]\n\n[image]: https://example.com/image.png");
         $result = $this->converter->convert($this->reader->read('source.md'));
-        self::assertCount(4, $result->warnings);
-        self::assertStringContainsString('Before  after', $result->storage);
-        self::assertStringNotContainsString('<img', $result->storage);
-        self::assertStringNotContainsString('missing.png', $result->storage);
+        self::assertCount(1, $result->warnings);
+        self::assertCount(1, $result->images);
+        self::assertSame('image.png', $result->images[0]->vaultPath);
+        self::assertStringContainsString('ac:width="300" ac:height="200"', $result->storage);
+        self::assertSame(2, substr_count($result->storage, '<ri:attachment'));
+        self::assertStringContainsString('<ri:url ri:value="https://example.com/image.png"', $result->storage);
     }
 
-    public function testItIgnoresUnsupportedFormattingInsideOmittedImages(): void
+    public function testImageNamesStayStableForChangedBytesAndDifferAcrossPaths(): void
     {
-        $this->note('source', '![==important==](missing.png) ![~~obsolete~~](other.png)');
+        mkdir($this->vault . '/Other');
+        $this->image('image.png');
+        $this->image('Other/image.png');
+        $this->note('source', '![one](image.png) ![two](Other/image.png)');
+        $before = $this->converter->convert($this->reader->read('source.md'));
+        file_put_contents($this->vault . '/image.png', 'changed', FILE_APPEND);
+        $after = $this->converter->convert($this->reader->read('source.md'));
+        self::assertNotSame($before->images[0]->filename, $before->images[1]->filename);
+        self::assertSame($before->images[0]->filename, $after->images[0]->filename);
+        self::assertNotSame($before->images[0]->content, $after->images[0]->content);
+    }
+
+    public function testImageAltFormattingDoesNotBlockPublication(): void
+    {
+        $this->image('image.png');
+        $this->note('source', '![==important==](image.png) ![~~obsolete~~](image.png)');
         $result = $this->converter->convert($this->reader->read('source.md'));
-        self::assertCount(2, $result->warnings);
-        self::assertStringNotContainsString('important', $result->storage);
-        self::assertStringNotContainsString('obsolete', $result->storage);
+        self::assertCount(1, $result->images);
+        self::assertSame(2, substr_count($result->storage, '<ac:image'));
+    }
+
+    public function testItExportsNestedCalloutsAndLeavesOrdinaryQuotesAndCodeAlone(): void
+    {
+        $this->note('source', <<<'MD'
+> [!note]- Outer & title
+> First **paragraph**.
+>
+> > [!info]+ Inner
+> > - Child
+>
+> Last paragraph.
+
+> Ordinary quote
+
+```markdown
+> [!note]- Literal
+```
+MD);
+        $result = $this->converter->convert($this->reader->read('source.md'));
+        self::assertSame(2, substr_count($result->storage, 'ac:name="expand"'));
+        self::assertStringContainsString('Outer &amp; title</ac:parameter>', $result->storage);
+        self::assertStringContainsString('<strong>paragraph</strong>', $result->storage);
+        self::assertStringContainsString('<li>Child</li>', $result->storage);
+        self::assertStringContainsString('Last paragraph.', $result->storage);
+        self::assertStringContainsString('<blockquote>', $result->storage);
+        self::assertStringContainsString('&gt; [!note]- Literal', $result->storage);
+    }
+
+    public function testImageSymlinksCannotEscapeTheVault(): void
+    {
+        symlink(__FILE__, $this->vault . '/image.png');
+        $this->note('source', '![[image.png]]');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('inside the vault');
+        $this->converter->convert($this->reader->read('source.md'));
+    }
+
+    public function testAmbiguousImageBasenamesFail(): void
+    {
+        mkdir($this->vault . '/Other');
+        $this->image('image.png');
+        $this->image('Other/image.png');
+        $this->note('source', '![[image.png]]');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ambiguous image');
+        $this->converter->convert($this->reader->read('source.md'));
+    }
+
+    public function testImagesInsideCalloutsRemainInsideTheExpandBody(): void
+    {
+        mkdir($this->vault . '/Folder');
+        $this->image('image.png');
+        $this->note('Folder/source', "> [!note]- Diagram\n> ![alt](../image.png)\n");
+        $result = $this->converter->convert($this->reader->read('Folder/source.md'));
+        self::assertCount(1, $result->images);
+        self::assertStringContainsString('<ac:rich-text-body><p><ac:image ac:alt="alt">', $result->storage);
+        self::assertStringContainsString('</ac:image></p>', $result->storage);
     }
 
     public function testItResolvesWikiAndMarkdownLinksIncludingAliasesAndFragments(): void
@@ -116,6 +191,8 @@ MD);
     /** @return iterable<string, array{string}> */
     public static function unsupportedBodies(): iterable
     {
+        yield 'missing image' => ['![[missing.png]]'];
+        yield 'unsafe image URL' => ['![bad](file:///tmp/image.png)'];
         yield 'missing wiki link' => ['[[missing]]'];
         yield 'missing markdown link' => ['[missing](missing.md)'];
         yield 'html' => ['<div>raw</div>'];
@@ -154,6 +231,11 @@ MD);
         self::assertSame('123', $note->pageId);
         self::assertSame('# Heading', $note->markdown);
         self::assertSame($before, file_get_contents($note->path));
+    }
+
+    private function image(string $path): void
+    {
+        file_put_contents($this->vault . '/' . $path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', true));
     }
 
     private function note(string $name, string $body, string $id = '123'): void

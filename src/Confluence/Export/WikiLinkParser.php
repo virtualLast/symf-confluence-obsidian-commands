@@ -29,6 +29,9 @@ final class WikiLinkParser implements InlineParserInterface
         $label = $parts[1] ?? null;
         $node = $embed ? new Image($target) : new Link($target, $label ?? $target);
         $node->data->set('obsidian', true);
+        if ($embed && $label !== null) {
+            $node->data->set('obsidian_size', $label);
+        }
         $inlineContext->getCursor()->advanceBy($inlineContext->getFullMatchLength());
         $inlineContext->getContainer()->appendChild($node);
 

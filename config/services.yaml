@@ -50,3 +50,6 @@ services:
 
     App\Confluence\Export\ConfluenceExportGatewayInterface:
         alias: App\Confluence\Export\ConfluenceExportClient
+
+    App\Confluence\Export\ConfluenceAttachmentPublisherInterface:
+        alias: App\Confluence\Export\ConfluenceAttachmentPublisher
