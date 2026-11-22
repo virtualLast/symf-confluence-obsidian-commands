@@ -1,6 +1,8 @@
-# Confluence to Obsidian Importer
+# Confluence and Obsidian Commands
 
-A Symfony console application that imports a Confluence page into an Obsidian vault.
+A Symfony console application that imports Confluence pages into an Obsidian vault and explicitly exports edited notes back to their original pages.
+
+Maintained by Lightfoot. See [architecture](ARCHITECTURE.md) for component boundaries and data flow.
 
 The command fetches the requested page from Confluence, renders its content, removes Confluence-specific presentation markup, converts the HTML to Markdown, cleans excessive blank lines, and writes the result to the configured vault.
 
@@ -51,6 +53,34 @@ The page title is converted to a lowercase slug and used as the filename. For ex
 Destinations must be relative paths contained within `OBSIDIAN_VAULT`; absolute paths, parent traversal, and symbolic links are rejected. If a title cannot produce a usable slug, the command uses a filename such as `untitled-26-07-15-14:30:00.md`.
 
 On success, the command prints the imported page title and full output path. Confluence or filesystem errors are displayed and return a failing exit code.
+
+### Exporting a note back to Confluence
+
+Preview the original page and its proposed replacement body:
+
+```shell
+php bin/console app:confluence:export "Inbox/Confluence/my-page.md"
+```
+
+Publish the replacement explicitly:
+
+```shell
+php bin/console app:confluence:export "Inbox/Confluence/my-page.md" --publish
+```
+
+The note path may be absolute or relative to `OBSIDIAN_VAULT`, and must resolve inside that vault. Use `--vault=/absolute/path/to/vault` to override it for both the selected note and link resolution. The note must have `source: confluence` and a valid `confluence.pageId`. The configured Confluence credentials need permission to update the destination.
+
+The preview shows the full destination URL, current page title and version, current storage markup, proposed storage markup, and warnings. It performs a remote read but no writes. Publishing displays the same preview and then replaces the body. The configured site must be the one the note came from: imported metadata does not record a site address.
+
+**The local body is authoritative.** Direct Confluence edits, macros, layouts, and other content absent from the exported body are overwritten. The entire Markdown body is included, including its first heading; YAML frontmatter is excluded. The title, parent location, existing attached files, and local note are left unchanged. The imported version is ignored. Publishing fetches the latest remote version and submits one update; concurrent-update failures stop without retrying. Transport failures may have an uncertain outcome: inspect the page before retrying.
+
+Supported content includes headings, paragraphs, emphasis, lists, code, tables, and links. Markdown images and Obsidian `![[...]]` embeds are omitted with individual warnings; attachment upload and deletion are not implemented. Raw HTML/Confluence markup and detected unsupported Obsidian syntax (including callouts, comments, footnotes, highlights, and block links) fail validation. Code examples remain literal.
+
+Wikilinks such as `[[note#Heading|Label]]` resolve to the target imported note's original Confluence page. Bare names must be unique across the vault; paths such as `[[Folder/note]]` are vault-relative, and `[[./note]]` is relative to the source note. Ordinary relative Markdown links resolve relative to the source file. Missing, ambiguous, or local-only targets block publication. HTTP, HTTPS, and mail links are preserved. Local links never cause other notes to be published.
+
+Success returns exit code 0; validation, read, or publish failures return 1. Publishing reports the resulting version and page URL. See the [approved export specification](docs/specs/confluence-export.md).
+
+On PHP 8.6, the installed Symfony session handler currently raises a deprecation during debug-mode startup. Use `php bin/console --no-debug app:confluence:export ...` if affected. This also applies to other commands; it is not an export failure.
 
 ### Metadata
 

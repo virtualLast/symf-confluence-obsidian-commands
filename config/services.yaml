@@ -47,3 +47,6 @@ services:
                 table_pipe_escape: '\|'
                 strip_tags: true
                 remove_nodes: 'style script'
+
+    App\Confluence\Export\ConfluenceExportGatewayInterface:
+        alias: App\Confluence\Export\ConfluenceExportClient

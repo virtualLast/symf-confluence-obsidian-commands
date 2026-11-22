@@ -17,6 +17,7 @@
         "ext-dom": "*",
         "ext-iconv": "*",
         "ext-libxml": "*",
+        "league/commonmark": "^2.7",
         "league/html-to-markdown": "^5.1",
         "nyholm/psr7": "^1.8",
         "symfony/console": "8.1.*",
